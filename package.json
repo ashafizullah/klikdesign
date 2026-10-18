@@ -1,0 +1,43 @@
+{
+  "name": "klikdesign",
+  "private": true,
+  "license": "MIT",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "test": "bun test src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
+    "@tauri-apps/plugin-fs": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-updater": "^2",
+    "jspdf": "^4.2.1",
+    "konva": "^10.9.0",
+    "lucide-react": "^1.59.0",
+    "nanoid": "^6.0.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-konva": "^19.3.2",
+    "zundo": "^2.3.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4"
+  }
+}

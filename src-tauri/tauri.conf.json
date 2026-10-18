@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "KlikDesign",
+  "version": "0.1.0",
+  "identifier": "com.ashafizullah.klikdesign",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "KlikDesign",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "theme": "Dark"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "GraphicsAndDesign",
+    "shortDescription": "Free, open-source AI poster designer",
+    "copyright": "MIT License",
+    "publisher": "KlikDesign contributors",
+    "homepage": "https://github.com/ashafizullah/klikdesign",
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-",
+      "hardenedRuntime": true
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQwRkJFNjJEMTUwNkI0OUUKUldTZXRBWVZMZWI3MEpiRHE1NzJyV2YxdVVLWVZ2QW5tZUt6cEUzVjNxcWgzaXQyY1VwU0h4VEMK",
+      "endpoints": [
+        "https://github.com/ashafizullah/klikdesign/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

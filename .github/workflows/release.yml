@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ""
+          - platform: ubuntu-24.04
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libdbus-1-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: bun install --frozen-lockfile
+      - name: Read this version's changelog
+        id: changelog
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes=$(awk -v h="## $version" '$0 == h {on=1; next} on && /^## / {exit} on' CHANGELOG.md)
+          if [ -z "$(echo "$notes" | tr -d '[:space:]')" ]; then
+            echo "CHANGELOG.md has no section for $version" >&2
+            exit 1
+          fi
+          {
+            echo "notes<<CHANGELOG_EOF"
+            echo "$notes"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update packages; the app ships the matching public key.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          # Developer ID signing and notarization, macOS only.
+          APPLE_CERTIFICATE: "${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}"
+          APPLE_CERTIFICATE_PASSWORD: "${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}"
+          APPLE_SIGNING_IDENTITY: "${{ matrix.platform == 'macos-latest' && 'Developer ID Application: Adam Suchi Hafizullah (5R7GGX57J4)' || '' }}"
+          APPLE_ID: "${{ matrix.platform == 'macos-latest' && secrets.APPLE_ID || '' }}"
+          APPLE_PASSWORD: "${{ matrix.platform == 'macos-latest' && secrets.APPLE_PASSWORD || '' }}"
+          APPLE_TEAM_ID: "${{ matrix.platform == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}"
+        with:
+          tauriScript: bun tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: KlikDesign ${{ github.ref_name }}
+          # The in-app update dialog shows this up to "## Download".
+          releaseBody: |
+            ${{ steps.changelog.outputs.notes }}
+
+            ## Download
+
+            **macOS** (Apple Silicon + Intel): run this in Terminal to install or reinstall:
+            ```sh
+            curl -fsSL https://raw.githubusercontent.com/ashafizullah/klikdesign/main/install.sh | bash
+            ```
+            Or download `KlikDesign_*_universal.dmg`, open it and drag KlikDesign into Applications.
+
+            **Windows**: download `KlikDesign_*_x64-setup.exe` (or the `.msi`).
+
+            **Linux** (x86_64): download the `.deb`, `.rpm` or `.AppImage`.
+          releaseDraft: true
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
