@@ -15,6 +15,7 @@
   <img src="https://img.shields.io/badge/Rust-stable-000000?logo=rust" alt="Rust">
   <a href="https://github.com/ashafizullah/klikdesign/actions/workflows/ci.yml"><img src="https://github.com/ashafizullah/klikdesign/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/ashafizullah/klikdesign/releases/latest"><img src="https://img.shields.io/github/v/release/ashafizullah/klikdesign?include_prereleases&label=release" alt="Release"></a>
+  <a href="https://github.com/ashafizullah/klikdesign/releases"><img src="https://img.shields.io/github/downloads/ashafizullah/klikdesign/total?color=brightgreen" alt="Downloads"></a>
 </p>
 
 <p align="center">
