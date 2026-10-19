@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an idea or improvement for KlikDesign
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search the [existing issues](https://github.com/ashafizullah/klikdesign/issues) first. If you'd like to build it yourself, say so below and we can agree on the approach before you start.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe what you're trying to do and what gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you've considered
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to work on this?
+      options:
+        - "No"
+        - Yes, I'd like to open a pull request

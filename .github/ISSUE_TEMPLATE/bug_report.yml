@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in KlikDesign doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please search the [existing issues](https://github.com/ashafizullah/klikdesign/issues) first. For security problems, use [Report a vulnerability](https://github.com/ashafizullah/klikdesign/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, and what happened instead.
+      placeholder: Rotated text layers jump to the top-left corner after undo.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: KlikDesign version
+      description: The release you installed, e.g. from the DMG or installer file name.
+      placeholder: 0.1.1
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: macOS 15.5 (Apple Silicon) / Windows 11 24H2 / Ubuntu 24.04
+  - type: input
+    id: ai
+    attributes:
+      label: AI provider and model
+      description: If the bug involves the AI. Never paste your API key.
+      placeholder: Anthropic, claude-sonnet-5-5
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Error messages or console logs. Remove API keys first.
