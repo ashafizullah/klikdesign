@@ -8,6 +8,7 @@ import type { Message, ToolDef } from "./ipc";
 import { FONTS, ensureFonts, nearestWeight } from "./fonts";
 import { renderPage, textLines } from "./stage";
 import { ipc } from "./ipc";
+import { linkedWorkspace } from "./workspace";
 import { jpegBase64, loadImage, loadWorkspaceImage } from "./images";
 import { textHeight } from "./geometry";
 import { runToolLoop, WithImage, type ToolArgs } from "./toolLoop";
@@ -239,9 +240,9 @@ async function exec(name: string, a: ToolArgs): Promise<unknown> {
 }
 
 function ws(): string {
-  const id = useDesign.getState().design.workspaceId;
-  if (!id) throw new Error("no project folder is linked to this design");
-  return id;
+  const ws = linkedWorkspace(useDesign.getState().design.workspaceId);
+  if (!ws) throw new Error("no project folder is linked to this design");
+  return ws.id;
 }
 
 export interface AgentCallbacks {
@@ -253,7 +254,8 @@ export interface AgentCallbacks {
 /** Runs the agent on `history` (extended in place); all its edits form one undo step. */
 export async function runAgent(history: Message[], cb: AgentCallbacks, signal: { cancelled: boolean }): Promise<string> {
   const vision = activeVision();
-  const wsId = useDesign.getState().design.workspaceId;
+  // Only a folder that is still linked; an unlinked one would fail every read.
+  const wsId = linkedWorkspace(useDesign.getState().design.workspaceId)?.id;
   // A first look at the linked project, so research starts from the README and file tree.
   const overview = wsId ? await ipc.wsOverview(wsId) : null;
   return asOneStep(() =>

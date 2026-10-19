@@ -287,4 +287,20 @@ mod tests {
         assert_eq!(image_bytes(root, "src/logo.svg").unwrap(), b"<svg/>");
         std::fs::remove_dir_all(d).unwrap();
     }
+
+    /// The AI's view of a real codebase: this repository.
+    #[test]
+    fn researches_a_real_project() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_str().unwrap().to_string();
+        let ov = overview(&root).unwrap();
+        assert!(ov.contains("## README.md") && ov.contains("KlikDesign"));
+        assert!(ov.contains("src-tauri/"));
+        assert!(read_file(&root, "src-tauri/tauri.conf.json", 60_000).unwrap().contains("com.ashafizullah.klikdesign"));
+        assert!(!search(&root, "klikdesign_lib", 5).unwrap().is_empty());
+        let imgs = images(&root, 200).unwrap();
+        assert!(imgs.iter().any(|p| p == "design/icon.png"));
+        assert!(imgs.iter().all(|p| !p.starts_with("node_modules/") && !p.contains("/target/")));
+        assert!(!image_bytes(&root, "design/icon.png").unwrap().is_empty());
+        assert!(read_file(&root, ".git/HEAD", 100).is_err());
+    }
 }

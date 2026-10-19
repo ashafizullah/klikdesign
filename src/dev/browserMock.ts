@@ -24,7 +24,7 @@ mockIPC(async (cmd, args) => {
     case "api_key_delete":
       return null;
     case "designs_list":
-      return [...designs.values()].map((j) => JSON.parse(j)).map((d) => ({ id: d.id, name: d.name, width: d.width, height: d.height, updatedAt: Date.now(), size: JSON.stringify(d).length, thumb: d.thumb ?? null }));
+      return [...designs.values()].map((j) => JSON.parse(j)).map((d) => ({ id: d.id, name: d.name, width: d.width, height: d.height, updatedAt: Date.now(), size: JSON.stringify(d).length, thumb: d.thumb ?? null, workspaceId: d.workspaceId ?? null }));
     case "design_store":
       designs.set(a.id, a.json);
       return null;

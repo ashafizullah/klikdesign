@@ -1,14 +1,13 @@
 // AI design chat: describe a poster on an empty page, or ask for changes.
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Loader2, Send, Sparkles, Square, Trash2, Wrench } from "lucide-react";
+import { AlertTriangle, Check, FolderGit2, Loader2, Send, Sparkles, Square, Trash2, Wrench } from "lucide-react";
 import { useChat } from "../../store/chat";
 import { useDesign } from "../../store/design";
 import { cancelChat, sendChat } from "../../lib/chat";
-import { linkDesign } from "../../lib/workspace";
+import { useApp } from "../../store/app";
 import { useT, type Key } from "../../i18n";
 import { Button, IconButton } from "../ui";
 import { ModelPicker } from "../ui/ModelPicker";
-import { ProjectPicker } from "../ui/ProjectPicker";
 
 const TOOL_LABELS: Record<string, Key> = {
   get_design: "tool.get_design",
@@ -36,6 +35,7 @@ export function ChatPanel() {
   const busy = useChat((s) => s.busy);
   const empty = useDesign((s) => s.design.elements.length === 0);
   const workspaceId = useDesign((s) => s.design.workspaceId);
+  const ws = useApp((s) => s.workspaces.find((w) => w.id === workspaceId));
   const [text, setText] = useState("");
   const list = useRef<HTMLDivElement>(null);
 
@@ -57,15 +57,17 @@ export function ChatPanel() {
         <div className="min-w-0 flex-1"><ModelPicker /></div>
         <IconButton title={t("chat.clear")} disabled={busy || !items.length} onClick={() => useChat.getState().reset()}><Trash2 size={14} /></IconButton>
       </div>
-      <div className="border-b border-line px-3 py-2">
-        <ProjectPicker value={workspaceId ?? null} disabled={busy} onChange={linkDesign} />
-      </div>
+      {ws && (
+        <div className="flex items-center gap-1.5 border-b border-line px-3 py-2 text-[11px] text-accent" title={ws.path}>
+          <FolderGit2 size={13} className="shrink-0" /> <span className="truncate">{t("chat.readsFolder", { name: ws.name })}</span>
+        </div>
+      )}
       <div ref={list} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {items.length === 0 && (
           <div className="space-y-3 py-4 text-center">
             <Sparkles className="mx-auto text-accent-2" size={22} />
             <p className="text-[12px] leading-relaxed text-muted">{t(empty ? "chat.introEmpty" : "chat.intro")}</p>
-            {workspaceId && <p className="text-[11px] leading-relaxed text-accent">{t("chat.introProject")}</p>}
+            {ws && <p className="text-[11px] leading-relaxed text-accent">{t("chat.introProject")}</p>}
             <div className="space-y-1.5">
               {suggestions.map((k) => (
                 <button key={k} onClick={() => send(t(k))} className="block w-full rounded-md border border-line bg-panel-2 px-2.5 py-2 text-left text-[11px] text-muted hover:border-accent hover:text-text">

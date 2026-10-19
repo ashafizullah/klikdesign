@@ -1,7 +1,6 @@
 // Linked project folders: the AI researches them to design on-brand posters.
 import { open } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../store/app";
-import { useDesign } from "../store/design";
 import { t } from "../i18n";
 import { ipc, type Workspace } from "./ipc";
 
@@ -11,12 +10,11 @@ export async function addWorkspace(): Promise<Workspace | null> {
   if (!path || Array.isArray(path)) return null;
   const ws = await ipc.workspaceAdd(path);
   await useApp.getState().refresh();
+  useApp.getState().selectWorkspace(ws.id);
   return ws;
 }
 
-/** Links the open design to a project folder (or unlinks it with null). */
-export function linkDesign(workspaceId: string | null) {
-  useDesign.getState().update((d) => void (d.workspaceId = workspaceId));
-}
-
 export const workspaceName = (id: string | null | undefined) => useApp.getState().workspaces.find((w) => w.id === id)?.name;
+
+/** The design's project folder, if it is still linked. */
+export const linkedWorkspace = (id: string | null | undefined) => useApp.getState().workspaces.find((w) => w.id === id) ?? null;

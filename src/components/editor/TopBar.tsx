@@ -3,6 +3,7 @@ import { useStore } from "zustand";
 import logo from "../../assets/logo.png";
 import { redo, undo, useDesign } from "../../store/design";
 import { useUi } from "../../store/ui";
+import { useApp } from "../../store/app";
 import { closeDesign } from "../../lib/library";
 import { useT } from "../../i18n";
 import { Button, IconButton } from "../ui";
@@ -12,6 +13,8 @@ export function TopBar() {
   const t = useT();
   const name = useDesign((s) => s.design.name);
   const dirty = useDesign((s) => s.dirty);
+  const wsId = useDesign((s) => s.design.workspaceId);
+  const ws = useApp((s) => s.workspaces.find((w) => w.id === wsId));
   const canUndo = useStore(useDesign.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useDesign.temporal, (s) => s.futureStates.length > 0);
   const zoom = useUi((s) => s.zoom ?? s.fitZoom);
@@ -21,6 +24,12 @@ export function TopBar() {
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-panel px-3" data-tauri-drag-region>
       <IconButton title={t("top.back")} onClick={closeDesign}><ArrowLeft size={16} /></IconButton>
       <img src={logo} alt="" className="h-7 w-7" draggable={false} />
+      {ws && (
+        <>
+          <span className="max-w-40 truncate text-[12px] text-muted" title={ws.path}>{ws.name}</span>
+          <span className="text-muted">/</span>
+        </>
+      )}
       <input
         className="w-64 rounded-md bg-transparent px-2 py-1 text-[13px] font-medium outline-none hover:bg-panel-2 focus:bg-panel-2"
         value={name}
