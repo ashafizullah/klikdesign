@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- Built-in terminal (Ctrl+` or the terminal button in the top bar), opened in the design's project folder
+- Works with Claude Code: turn on the local MCP server (terminal → Connect Claude Code), add it to your own Claude Code once, and ask Claude to lay out and edit designs, place images, look at the result and export PNG, JPG, PDF or SVG. Changes show up live and can be undone, and a green badge shows when Claude Code is connected
+- Without an API key, the AI chat now tells you right away how to add one or use Claude Code instead
+
 ## 0.1.1
 
 - Workspaces like KlikReel: add a project folder first, then create designs inside it. Every design in a workspace is linked to its folder, so the AI always researches that codebase (copy, brand colors, logo, screenshots)
