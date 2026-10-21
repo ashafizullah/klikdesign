@@ -51,14 +51,22 @@ export async function createDesign(over: Partial<Design> = {}): Promise<void> {
   await saveNow();
 }
 
+/** Loads a design and opens it; throws on failure. */
+export async function loadDesign(id: string) {
+  const { thumb, ...rest } = JSON.parse(await ipc.designFetch(id)) as Design & { thumb?: string };
+  enter(normalizeDesign(rest));
+  lastThumb = thumb;
+}
+
 export async function openDesign(id: string) {
-  try {
-    const { thumb, ...rest } = JSON.parse(await ipc.designFetch(id)) as Design & { thumb?: string };
-    enter(normalizeDesign(rest));
-    lastThumb = thumb;
-  } catch (e) {
-    notifyError(e);
-  }
+  await loadDesign(id).catch(notifyError);
+}
+
+/** Saves and leaves the open design so another can be opened in its place. */
+export async function leaveDesign() {
+  if (useApp.getState().view !== "editor") return;
+  clearTimeout(timer);
+  await saveNow();
 }
 
 export async function closeDesign() {

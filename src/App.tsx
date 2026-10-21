@@ -1,3 +1,4 @@
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Home } from "./components/home/Home";
 import { TopBar } from "./components/editor/TopBar";
 import { LeftPanel } from "./components/editor/LeftPanel";
@@ -12,6 +13,23 @@ import { useUi } from "./store/ui";
 import { useApp } from "./store/app";
 import { useShortcuts } from "./lib/shortcuts";
 import { useT } from "./i18n";
+import "./lib/mcp";
+
+const TerminalPanel = lazy(() => import("./components/terminal/TerminalPanel"));
+
+/** Starts the shell only once the panel is first opened; it lives until the design closes. */
+function TerminalSlot() {
+  const visible = useUi((s) => s.terminal);
+  const [started, setStarted] = useState(visible);
+  useEffect(() => {
+    if (visible) setStarted(true);
+  }, [visible]);
+  return started ? (
+    <Suspense fallback={null}>
+      <TerminalPanel />
+    </Suspense>
+  ) : null;
+}
 
 export default function App() {
   useShortcuts();
@@ -31,6 +49,7 @@ export default function App() {
             <ErrorBoundary name={t("panel.canvas")}><Canvas /></ErrorBoundary>
             <RightPanel />
           </div>
+          <ErrorBoundary name={t("panel.terminal")}><TerminalSlot /></ErrorBoundary>
         </>
       )}
       {dialog === "settings" && <SettingsDialog />}

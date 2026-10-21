@@ -13,6 +13,15 @@ import { jpegBase64, loadImage, loadWorkspaceImage } from "./images";
 import { textHeight } from "./geometry";
 import { runToolLoop, WithImage, type ToolArgs } from "./toolLoop";
 
+/** Design rules and reference for a model that edits the page through `tools()`. */
+export function designGuide(): string {
+  const linked = !!linkedWorkspace(useDesign.getState().design.workspaceId);
+  return system(true, null) +
+    (linked
+      ? "\n\nA project folder is linked to this design: find its logo and screenshots with list_project_images, look at them with view_project_image and place them with place_project_image."
+      : "");
+}
+
 function system(vision: boolean, project: string | null): string {
   const { width, height } = useDesign.getState().design;
   const fonts = FONTS.map((f) => `${f.family} (${f.category}; weights ${f.weights.join("/")})`).join("\n- ");
@@ -71,7 +80,7 @@ const element = {
   required: ["type", "x", "y", "w"],
 };
 
-function tools(vision: boolean, project: boolean): ToolDef[] {
+export function tools(vision: boolean, project: boolean): ToolDef[] {
   const list: ToolDef[] = [
     { name: "get_design", description: "Returns the page size, background and every element (text heights are measured).", parameters: obj({}) },
     {
@@ -117,7 +126,7 @@ function tools(vision: boolean, project: boolean): ToolDef[] {
 
 const r = (v: number) => Math.round(v * 10) / 10;
 
-function describe(): unknown {
+export function describe(): unknown {
   const { design } = useDesign.getState();
   const lines = textLines();
   return {
@@ -150,15 +159,23 @@ function toElement(raw: Record<string, unknown>, id: string): El {
   return el;
 }
 
-/** Lets the canvas lay out new text before the model reads measurements. */
+/**
+ * Lets the canvas lay out new text before the model reads measurements. The
+ * timeout covers a hidden window, where animation frames stop (Claude Code may
+ * drive the app from another terminal).
+ */
 const settle = async (els: El[]) => {
   await ensureFonts(els.flatMap((e) => (e.type === "text" ? [e.fontFamily] : [])));
-  await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+  await Promise.race([
+    new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))),
+    new Promise((res) => setTimeout(res, 150)),
+  ]);
 };
 
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 
-async function exec(name: string, a: ToolArgs): Promise<unknown> {
+/** Runs one of `tools()` against the open design. */
+export async function exec(name: string, a: ToolArgs): Promise<unknown> {
   const store = useDesign.getState();
   switch (name) {
     case "get_design":

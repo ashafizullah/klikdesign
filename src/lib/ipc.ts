@@ -55,6 +55,8 @@ export interface Workspace {
   createdAt: number;
 }
 
+export type TerminalEvent = { type: "data"; data: string } | { type: "exit"; code: number | null };
+
 export const ipc = {
   apiKeysStatus: (profileIds: string[]) => invoke<Record<string, boolean>>("api_keys_status", { profileIds }),
   apiKeySet: (profileId: string, key: string) => invoke<void>("api_key_set", { profileId, key }),
@@ -83,5 +85,13 @@ export const ipc = {
   wsSearch: (workspaceId: string, query: string) => invoke<string[]>("ws_search", { workspaceId, query }),
   wsImages: (workspaceId: string) => invoke<string[]>("ws_images", { workspaceId }),
   wsImageBytes: (workspaceId: string, path: string) => invoke<ArrayBuffer>("ws_image_bytes", { workspaceId, path }),
+  terminalOpen: (cwd: string, cols: number, rows: number, onEvent: (e: TerminalEvent) => void) => {
+    const ch = new Channel<TerminalEvent>();
+    ch.onmessage = onEvent;
+    return invoke<string>("terminal_open", { cwd, cols, rows, onEvent: ch });
+  },
+  terminalWrite: (id: string, data: string) => invoke<void>("terminal_write", { id, data }),
+  terminalResize: (id: string, cols: number, rows: number) => invoke<void>("terminal_resize", { id, cols, rows }),
+  terminalClose: (id: string) => invoke<void>("terminal_close", { id }),
   wsImageImport: (designId: string, workspaceId: string, path: string) => invoke<string>("ws_image_import", { designId, workspaceId, path }),
 };

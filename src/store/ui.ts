@@ -19,6 +19,9 @@ interface UiState {
   editingTextId: string | null;
   setEditingText(id: string | null): void;
   dialog: null | "settings" | "export";
+  /** In-app terminal panel visibility. */
+  terminal: boolean;
+  toggleTerminal(): void;
   toast: { kind: "info" | "error"; text: string } | null;
   open(d: UiState["dialog"]): void;
   notify(text: string, kind?: "info" | "error"): void;
@@ -38,6 +41,8 @@ export const useUi = create<UiState>()((set) => ({
   editingTextId: null,
   setEditingText: (editingTextId) => set({ editingTextId }),
   dialog: null,
+  terminal: false,
+  toggleTerminal: () => set((s) => ({ terminal: !s.terminal })),
   toast: null,
   open: (dialog) => set({ dialog }),
   notify: (text, kind = "info") => {

@@ -3,6 +3,7 @@ import { useChat, type ChatItem } from "../store/chat";
 import { useDesign } from "../store/design";
 import { localizeMessage, t } from "../i18n";
 import { runAgent } from "./agent";
+import { aiReady } from "../store/settings";
 
 let signal = { cancelled: false };
 
@@ -10,6 +11,11 @@ export async function sendChat(text: string): Promise<void> {
   const chat = useChat.getState();
   if (chat.busy || !text.trim()) return;
   // On an empty page the request is a brief for a new poster.
+  if (!(await aiReady())) {
+    chat.push({ kind: "user", text: text.trim() });
+    chat.push({ kind: "error", text: t("err.noAiKey") });
+    return;
+  }
   const empty = useDesign.getState().design.elements.length === 0;
   const prompt = empty ? `Design a new poster for this brief:\n\n${text.trim()}` : text.trim();
   const history = [...chat.history, { role: "user" as const, content: [{ type: "text" as const, text: prompt }] }];

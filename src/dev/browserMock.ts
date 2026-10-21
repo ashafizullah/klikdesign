@@ -122,6 +122,19 @@ mockIPC(async (cmd, args) => {
       return 1;
     case "plugin:event|unlisten":
       return null;
+    case "mcp_start":
+      return { url: "http://127.0.0.1:47822/mcp", token: "mock-token" };
+    case "mcp_link":
+      return { running: true, connected: true, client: "claude-code (mock)", idleSecs: 3 };
+    case "mcp_stop":
+    case "mcp_reply":
+      return null;
+    case "terminal_open":
+      return "term_mock";
+    case "terminal_write":
+    case "terminal_resize":
+    case "terminal_close":
+      return null;
     default:
       throw new Error(`${cmd} is not available in browser mode`);
   }

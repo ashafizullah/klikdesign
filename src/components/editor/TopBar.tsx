@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, KeyRound, Maximize, Minus, Plus, Redo2, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, KeyRound, Maximize, Minus, Plus, Redo2, SquareTerminal, Undo2 } from "lucide-react";
 import { useStore } from "zustand";
 import logo from "../../assets/logo.png";
 import { redo, undo, useDesign } from "../../store/design";
@@ -8,6 +8,7 @@ import { closeDesign } from "../../lib/library";
 import { useT } from "../../i18n";
 import { Button, IconButton } from "../ui";
 import { LanguageToggle } from "../ui/LanguageToggle";
+import { McpBadge } from "../terminal/McpBadge";
 
 export function TopBar() {
   const t = useT();
@@ -20,6 +21,7 @@ export function TopBar() {
   const zoom = useUi((s) => s.zoom ?? s.fitZoom);
   const setZoom = useUi((s) => s.setZoom);
   const open = useUi((s) => s.open);
+  const terminal = useUi((s) => s.terminal);
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-panel px-3" data-tauri-drag-region>
       <IconButton title={t("top.back")} onClick={closeDesign}><ArrowLeft size={16} /></IconButton>
@@ -49,6 +51,8 @@ export function TopBar() {
         <IconButton title={t("top.zoomFit")} onClick={() => setZoom(null)}><Maximize size={13} /></IconButton>
       </div>
       <div className="flex-1" />
+      <McpBadge />
+      <IconButton title={t("top.terminal")} active={terminal} onClick={() => useUi.getState().toggleTerminal()}><SquareTerminal size={16} /></IconButton>
       <LanguageToggle />
       <Button variant="ghost" onClick={() => open("settings")}><KeyRound size={14} /> {t("home.aiSettings")}</Button>
       <Button variant="primary" onClick={() => open("export")}><Download size={14} /> {t("top.export")}</Button>

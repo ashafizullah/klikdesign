@@ -3,6 +3,8 @@ mod commands;
 mod error;
 mod keys;
 mod library;
+mod mcp;
+mod terminal;
 mod workspace;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -13,10 +15,12 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .manage(terminal::Terminals::default())
         .setup(|app| {
             use tauri::Manager;
             let dir = app.path().app_data_dir()?;
             keys::init(dir.clone());
+            app.manage(mcp::Mcp::new(dir.clone()));
             app.manage(library::Library::new(dir));
             Ok(())
         })
@@ -42,6 +46,15 @@ pub fn run() {
             commands::ws_images,
             commands::ws_image_bytes,
             commands::ws_image_import,
+            commands::terminal_open,
+            commands::terminal_write,
+            commands::terminal_resize,
+            commands::terminal_close,
+            commands::mcp_start,
+            commands::mcp_stop,
+            commands::mcp_link,
+            commands::mcp_reply,
+            commands::export_write,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

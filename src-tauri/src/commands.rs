@@ -142,3 +142,79 @@ pub async fn ws_image_bytes(workspace_id: String, path: String, lib: State<'_, L
 pub fn ws_image_import(design_id: String, workspace_id: String, path: String, lib: State<'_, Library>) -> AppResult<String> {
     lib.import_workspace_image(&design_id, &workspace_id, &path)
 }
+
+// ---- terminal ---------------------------------------------------------------
+
+use crate::terminal::{TerminalEvent, Terminals};
+
+#[tauri::command]
+pub fn terminal_open(
+    cwd: String,
+    cols: u16,
+    rows: u16,
+    on_event: Channel<TerminalEvent>,
+    state: State<'_, Terminals>,
+) -> AppResult<String> {
+    state.open(&cwd, cols, rows, on_event)
+}
+
+#[tauri::command]
+pub fn terminal_write(id: String, data: String, state: State<'_, Terminals>) -> AppResult<()> {
+    state.write(&id, &data)
+}
+
+#[tauri::command]
+pub fn terminal_resize(id: String, cols: u16, rows: u16, state: State<'_, Terminals>) -> AppResult<()> {
+    state.resize(&id, cols, rows)
+}
+
+#[tauri::command]
+pub fn terminal_close(id: String, state: State<'_, Terminals>) {
+    state.close(&id);
+}
+
+// ---- MCP (Claude Code) -------------------------------------------------------
+
+use crate::mcp::{Mcp, McpCall, McpInfo, McpLink};
+
+#[tauri::command]
+pub async fn mcp_start(
+    tools: serde_json::Value,
+    instructions: String,
+    on_call: Channel<McpCall>,
+    state: State<'_, Mcp>,
+) -> AppResult<McpInfo> {
+    state.start(tools, instructions, on_call).await
+}
+
+#[tauri::command]
+pub fn mcp_stop(state: State<'_, Mcp>) {
+    state.stop();
+}
+
+#[tauri::command]
+pub fn mcp_link(state: State<'_, Mcp>) -> McpLink {
+    state.link()
+}
+
+#[tauri::command]
+pub fn mcp_reply(id: u64, result: serde_json::Value, state: State<'_, Mcp>) {
+    state.reply(id, result);
+}
+
+/// Writes an export that Claude Code asked for (over MCP) to an absolute path.
+#[tauri::command]
+pub fn export_write(path: String, data: String) -> AppResult<()> {
+    use base64::Engine;
+    let p = std::path::Path::new(&path);
+    let ext = p.extension().and_then(|e| e.to_str()).map(str::to_lowercase).unwrap_or_default();
+    if !p.is_absolute() || !["png", "jpg", "jpeg", "pdf", "svg"].contains(&ext.as_str()) {
+        return Err(AppError::msg("path must be absolute and end in .png, .jpg, .pdf or .svg"));
+    }
+    let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| AppError::msg(e.to_string()))?;
+    if let Some(dir) = p.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(p, bytes)?;
+    Ok(())
+}

@@ -36,8 +36,20 @@
 - **Templates and sizes**: Instagram post and story, A4, poster, banner or a custom size
 - **Export** to PNG and JPG (0.5×–3×), PDF for print, and SVG
 - **Bring your own model**: Anthropic or any OpenAI-compatible API; keys are stored in the OS keychain
+- **Built-in terminal** (Ctrl+`) opened in your project folder
+- **Works with Claude Code**: turn on the local MCP server and your own Claude Code can lay out and edit designs, place images, look at the result and export
 - **Auto-save** to a local library, and **auto-update** from GitHub Releases (signed packages)
 - **English and Bahasa Indonesia** interface
+
+## Using Claude Code
+
+KlikDesign can be driven by [Claude Code](https://claude.com/claude-code) installed on your own computer, signed in with your own account (including Pro/Max plans):
+
+1. Open a design, open the terminal (Ctrl+`) and click **Connect Claude Code**.
+2. Enable the local MCP server and copy the `claude mcp add …` command. Run it once in any terminal.
+3. Start `claude` and ask for changes, e.g. *"make a launch poster for our new feature"*. Edits appear live in KlikDesign and can be undone.
+
+The server only listens on `127.0.0.1` and requires a secret token. KlikDesign never launches Claude Code, sends it prompts, reads its output or touches your Claude credentials: you add the server and run Claude Code yourself.
 
 ## Download
 
