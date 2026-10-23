@@ -24,6 +24,7 @@ export interface Connection {
   baseUrl?: string | null;
 }
 export interface ChatRequest extends Connection {
+  effort?: string | null;
   system?: string;
   messages: Message[];
   tools?: ToolDef[];
@@ -62,6 +63,8 @@ export const ipc = {
   apiKeySet: (profileId: string, key: string) => invoke<void>("api_key_set", { profileId, key }),
   apiKeyDelete: (profileId: string) => invoke<void>("api_key_delete", { profileId }),
 
+  models: (request: Omit<Connection, "model">) => invoke<string[]>("ai_models", { request }),
+
   chat: (request: ChatRequest, onText?: (t: string) => void) => {
     const ch = new Channel<AiStreamEvent>();
     ch.onmessage = (e) => onText?.(e.text);
@@ -73,6 +76,7 @@ export const ipc = {
   designFetch: (id: string) => invoke<string>("design_fetch", { id }),
   designDelete: (id: string) => invoke<void>("design_delete", { id }),
   mediaImport: (id: string, path: string) => invoke<string>("media_import", { id, path }),
+  mediaList: (id: string) => invoke<string[]>("media_list", { id }),
   mediaBytes: (path: string) => invoke<ArrayBuffer>("media_bytes", { path }),
 
   workspaces: () => invoke<Workspace[]>("workspaces_list"),

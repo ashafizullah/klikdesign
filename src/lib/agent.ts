@@ -5,11 +5,13 @@ import { normalizeElement, normalizeFill } from "../types/design";
 import { asOneStep, useDesign, type Reorder } from "../store/design";
 import { activeVision } from "../store/settings";
 import type { Message, ToolDef } from "./ipc";
-import { FONTS, ensureFonts, nearestWeight } from "./fonts";
+import { FONTS, ensureFonts, fontInfo, loadSystemFonts, nearestWeight, useFonts } from "./fonts";
+import { mediaChanged } from "./media";
 import { renderPage, textLines } from "./stage";
 import { ipc } from "./ipc";
 import { linkedWorkspace } from "./workspace";
 import { jpegBase64, loadImage, loadWorkspaceImage } from "./images";
+import { LOCALES, translate } from "../i18n";
 import { textHeight } from "./geometry";
 import { runToolLoop, WithImage, type ToolArgs } from "./toolLoop";
 
@@ -22,8 +24,11 @@ export function designGuide(): string {
       : "");
 }
 
+/** The design still has the default name in some language, so the AI may title it. */
+export const isUntitled = (name: string) => !name.trim() || LOCALES.some((l) => translate(l.id, "home.untitled") === name);
+
 function system(vision: boolean, project: string | null): string {
-  const { width, height } = useDesign.getState().design;
+  const { width, height, name } = useDesign.getState().design;
   const fonts = FONTS.map((f) => `${f.family} (${f.category}; weights ${f.weights.join("/")})`).join("\n- ");
   return `You are a senior graphic designer working inside KlikDesign, a Canva-like poster editor. You design and revise the open page only through tools.
 
@@ -36,8 +41,9 @@ Element types:
 Any element also takes opacity (0–1), name, and shadow {color, blur, offsetX, offsetY}.
 A fill is a CSS color ("#0f172a", "rgba(0,0,0,0.5)") or a linear gradient {"kind":"linear","angle":deg,"colors":["#…","#…"]} (0° = left→right, 90° = top→bottom).
 
-Available fonts (use only these):
+Available fonts (use these):
 - ${fonts}
+Fonts installed on this computer are also allowed, but only when the user asks for one or it is the brand font (list_installed_fonts).
 
 How to work:
 1. Call get_design first; never invent element ids.
@@ -45,7 +51,7 @@ How to work:
 3. Design like a professional: a clear hierarchy (one dominant headline, large and bold), generous margins (at least 6% of the page width), aligned edges, consistent spacing, at most two font families, a limited palette of 2–4 colors with strong contrast for text. Decorative shapes should support the layout, not clutter it. Keep every element inside the page unless it is a deliberate bleed.
 4. Write copy in the user's language. Use real, specific wording from the brief; invent plausible details (date, place, price) only when the user did not give them and the poster needs them.
 5. To revise, change only what the user asked for, with update_elements; keep the rest.${vision ? "\n6. After building or a larger change, call view_design to look at the result and fix overlaps, cut-off text, poor contrast or awkward spacing." : ""}
-Finish with one or two sentences, in the user's language, summarising what you made or changed.${project ? projectSection(project, vision) : ""}`;
+${isUntitled(name) ? "The design has no title yet: once you know what it is about, call rename_design with a short title (2–5 words) in the user's language.\n" : ""}Finish with one or two sentences, in the user's language, summarising what you made or changed.${project ? projectSection(project, vision) : ""}`;
 }
 
 function projectSection(overview: string, vision: boolean): string {
@@ -106,7 +112,24 @@ export function tools(vision: boolean, project: boolean): ToolDef[] {
       parameters: obj({ ids: { type: "array", items: str }, to: { type: "string", enum: ["front", "back", "forward", "backward"] } }, ["ids", "to"]),
     },
   ];
-  if (vision) list.push({ name: "view_design", description: "Shows you a rendered image of the current page.", parameters: obj({}) });
+  list.push(
+    { name: "rename_design", description: "Renames the open design (its title in the library).", parameters: obj({ name: str }, ["name"]) },
+    { name: "list_design_images", description: "Lists the images stored with this design (uploaded or dropped by the user, or copied in earlier), newest first, with their pixel size.", parameters: obj({}) },
+    {
+      name: "place_design_image",
+      description: "Places an image stored with this design (a path from list_design_images). Give w (and optionally h; by default the image keeps its aspect ratio). Returns the element id.",
+      parameters: obj({ path: str, x: num, y: num, w: num, h: num, cornerRadius: num, name: str }, ["path", "x", "y", "w"]),
+    },
+    {
+      name: "list_installed_fonts",
+      description: "Lists font families installed on this computer, with weights. Use one only when the user asks for it or it is the brand font: they are not embedded in SVG exports and their licenses vary.",
+      parameters: obj({ query: { ...str, description: "Optional case-insensitive filter on the family name" } }),
+    },
+  );
+  if (vision) list.push(
+    { name: "view_design", description: "Shows you a rendered image of the current page.", parameters: obj({}) },
+    { name: "view_design_image", description: "Shows you an image stored with this design.", parameters: obj({ path: str }, ["path"]) },
+  );
   if (project) {
     list.push(
       { name: "list_files", description: "Lists files and folders (folders end with /) in the project folder.", parameters: obj({ dir: { ...str, description: "Folder relative to the project root; empty for the root" }, depth: num }) },
@@ -130,6 +153,7 @@ export function describe(): unknown {
   const { design } = useDesign.getState();
   const lines = textLines();
   return {
+    name: design.name,
     width: design.width,
     height: design.height,
     background: design.background,
@@ -147,12 +171,12 @@ export function describe(): unknown {
   };
 }
 
-/** Normalizes AI input into an element; unknown fonts fall back to Inter. */
+/** Normalizes AI input into an element; unknown fonts fall back to Inter (installed ones the user picked are kept). */
 function toElement(raw: Record<string, unknown>, id: string): El {
   const el = normalizeElement(raw, id);
   if (!el) throw new Error(`invalid element type ${String(raw.type)}; use text or shape`);
   if (el.type === "text") {
-    if (!FONTS.some((f) => f.family === el.fontFamily)) el.fontFamily = "Inter";
+    if (!fontInfo(el.fontFamily)) el.fontFamily = "Inter";
     el.fontWeight = nearestWeight(el.fontFamily, el.fontWeight);
     if (typeof raw.h !== "number") el.h = el.fontSize * el.lineHeight;
   }
@@ -180,6 +204,12 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
   switch (name) {
     case "get_design":
       return describe();
+    case "rename_design": {
+      const title = typeof a.name === "string" ? a.name.trim().slice(0, 80) : "";
+      if (!title) throw new Error("name must not be empty");
+      store.update((d) => void (d.name = title));
+      return { ok: true };
+    }
     case "set_canvas":
       store.update((d) => {
         if (a.background !== undefined) d.background = normalizeFill(a.background, "#ffffff");
@@ -231,6 +261,26 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
       const hits = await ipc.wsSearch(ws(), String(a.query));
       return hits.length ? hits.join("\n") : "no matches";
     }
+    case "list_design_images": {
+      const srcs = await ipc.mediaList(store.design.id);
+      if (!srcs.length) return "no images are stored with this design";
+      const sizes = await Promise.all(srcs.map((src) => loadImage(src).then((i) => `${i.naturalWidth}×${i.naturalHeight}`, () => "unreadable")));
+      return srcs.map((src, i) => `${src} (${sizes[i]})`).join("\n");
+    }
+    case "view_design_image": {
+      const src = await designImage(String(a.path));
+      const img = await loadImage(src);
+      return new WithImage(`${src} (${img.naturalWidth}×${img.naturalHeight})`, { mediaType: "image/jpeg", data: jpegBase64(img) });
+    }
+    case "place_design_image":
+      return addImage(await designImage(String(a.path)), a);
+    case "list_installed_fonts": {
+      await loadSystemFonts();
+      const q = typeof a.query === "string" ? a.query.trim().toLowerCase() : "";
+      const list = useFonts.getState().system.filter((f) => !q || f.family.toLowerCase().includes(q));
+      if (!list.length) return q ? `no installed font matches "${q}"` : "no installed fonts found";
+      return list.slice(0, 400).map((f) => `${f.family} (weights ${f.weights.join("/")}${f.italic ? "; italic" : ""})`).join("\n");
+    }
     case "list_project_images": {
       const imgs = await ipc.wsImages(ws());
       return imgs.length ? imgs.join("\n") : "no images in the project";
@@ -241,19 +291,32 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
     }
     case "place_project_image": {
       const src = await ipc.wsImageImport(store.design.id, ws(), String(a.path));
-      const img = await loadImage(src);
-      const w = Math.max(1, Number(a.w) || 200);
-      const ratio = img.naturalWidth && img.naturalHeight ? img.naturalHeight / img.naturalWidth : 1;
-      const h = typeof a.h === "number" && a.h > 0 ? a.h : w * ratio;
-      const [id] = useDesign.getState().add([{
-        type: "image", src, x: Number(a.x) || 0, y: Number(a.y) || 0, w, h, rotation: 0, opacity: 1,
-        name: typeof a.name === "string" ? a.name : undefined, cornerRadius: typeof a.cornerRadius === "number" ? a.cornerRadius : undefined,
-      }]);
-      return { id, w, h: Math.round(h) };
+      mediaChanged();
+      return addImage(src, a);
     }
     default:
       throw new Error(`unknown tool: ${name}`);
   }
+}
+
+/** Places a stored image (x, y, w and optional h, cornerRadius, name from the tool input). */
+export async function addImage(src: string, a: ToolArgs) {
+  const img = await loadImage(src);
+  const w = Math.max(1, Number(a.w) || 200);
+  const ratio = img.naturalWidth && img.naturalHeight ? img.naturalHeight / img.naturalWidth : 1;
+  const h = typeof a.h === "number" && a.h > 0 ? a.h : w * ratio;
+  const [id] = useDesign.getState().add([{
+    type: "image", src, x: Number(a.x) || 0, y: Number(a.y) || 0, w, h, rotation: 0, opacity: 1,
+    name: typeof a.name === "string" ? a.name : undefined, cornerRadius: typeof a.cornerRadius === "number" ? a.cornerRadius : undefined,
+  }]);
+  return { id, w, h: Math.round(h) };
+}
+
+/** A path from list_design_images; anything else is refused. */
+async function designImage(path: string): Promise<string> {
+  const srcs = await ipc.mediaList(useDesign.getState().design.id);
+  if (!srcs.includes(path)) throw new Error("not an image of this design; use a path from list_design_images");
+  return path;
 }
 
 function ws(): string {

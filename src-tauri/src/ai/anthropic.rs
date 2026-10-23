@@ -1,5 +1,5 @@
 //! Anthropic Messages API (raw HTTP, streaming).
-use super::{ChatRequest, ChatResult, Message, Part, Role, check_status, parse_tool_input, push_text, sse};
+use super::{ChatRequest, ChatResult, Message, ModelsRequest, Part, Role, check_status, parse_tool_input, push_text, sse};
 use crate::error::{AppError, AppResult};
 use crate::keys;
 use serde_json::{Map, Value, json};
@@ -35,6 +35,9 @@ pub fn build_body(req: &ChatRequest) -> Value {
                 })
             })
             .collect();
+    }
+    if let Some(effort) = req.effort() {
+        body["output_config"] = json!({ "effort": effort });
     }
     if first_party(req) && FALLBACK_MODELS.contains(&req.model.as_str()) {
         body["fallbacks"] = json!("default");
@@ -190,6 +193,27 @@ pub async fn chat(client: &reqwest::Client, req: &ChatRequest, on_text: &mut (dy
     Ok(state.finish())
 }
 
+/// Model ids, newest first, following the list's pages.
+pub async fn models(client: &reqwest::Client, req: &ModelsRequest) -> AppResult<Vec<String>> {
+    let key = keys::require(&req.profile_id)?;
+    let base = req.base_url.as_deref().filter(|b| !b.trim().is_empty()).unwrap_or(DEFAULT_BASE).trim_end_matches('/');
+    let mut ids = Vec::new();
+    let mut after: Option<String> = None;
+    loop {
+        // Model ids are URL-safe ([a-z0-9-.]), so no encoding is needed.
+        let cursor = after.as_deref().map(|a| format!("&after_id={a}")).unwrap_or_default();
+        let http =
+            client.get(format!("{base}/v1/models?limit=1000{cursor}")).header("x-api-key", &key).header("anthropic-version", "2023-06-01");
+        let page: Value = check_status(http.send().await?).await?.json().await?;
+        let data = page["data"].as_array().cloned().unwrap_or_default();
+        ids.extend(data.iter().filter_map(|m| m["id"].as_str().map(str::to_string)));
+        after = page["last_id"].as_str().map(str::to_string);
+        if page["has_more"] != json!(true) || after.is_none() || data.is_empty() {
+            return Ok(ids);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,10 +273,14 @@ mod tests {
             }],
             tools: vec![],
             max_tokens: None,
+            effort: None,
         };
         let b = build_body(&req);
         assert_eq!(b["messages"][0]["content"][0]["type"], "tool_result");
         assert_eq!(b["fallbacks"], "default");
         assert_eq!(b["system"], "sys");
+        assert!(b.get("output_config").is_none());
+        let b = build_body(&ChatRequest { effort: Some("xhigh".into()), ..req });
+        assert_eq!(b["output_config"]["effort"], "xhigh");
     }
 }

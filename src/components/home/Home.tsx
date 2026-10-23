@@ -2,14 +2,13 @@
 // the left, the selected workspace's designs on the right. Designs made in a
 // workspace are linked to its folder, so the AI researches that codebase.
 import { useCallback, useEffect, useState } from "react";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getVersion } from "@tauri-apps/api/app";
 import { ExternalLink, Folder, FolderOpen, FolderPlus, Inbox, KeyRound, Loader2, Palette, Pencil, Plus, RefreshCw, Sparkles, Trash2, Unlink } from "lucide-react";
 import logo from "../../assets/logo.png";
 import { SIZE_PRESETS } from "../../types/design";
 import { NO_WORKSPACE, groupOf, useApp } from "../../store/app";
-import { notifyError, useUi } from "../../store/ui";
+import { confirm, notifyError, useUi } from "../../store/ui";
 import { createDesign, openDesign } from "../../lib/library";
 import { sendChat } from "../../lib/chat";
 import { ipc, type DesignMeta, type Workspace } from "../../lib/ipc";
@@ -57,13 +56,13 @@ export function Home() {
   };
 
   const removeWorkspace = async (w: Workspace) => {
-    if (!(await ask(t("ws.removeConfirm", { name: w.name }), { title: t("ws.remove"), kind: "warning" }))) return;
+    if (!(await confirm({ title: t("ws.remove"), message: t("ws.removeConfirm", { name: w.name }), confirmLabel: t("ws.unlink") }))) return;
     await ipc.workspaceRemove(w.id).catch(notifyError);
     await refresh();
   };
 
   const removeDesign = async (d: DesignMeta) => {
-    if (!(await ask(t("home.deleteConfirm", { name: d.name }), { title: t("home.deleteDesign"), kind: "warning" }))) return;
+    if (!(await confirm({ title: t("home.deleteDesign"), message: t("home.deleteConfirm", { name: d.name }), confirmLabel: t("common.delete"), danger: true }))) return;
     await ipc.designDelete(d.id).catch(notifyError);
     await refresh();
   };
@@ -164,14 +163,14 @@ export function Home() {
             <FolderPlus size={14} /> {t("ws.add")}
           </button>
         </div>
-        <div className="flex items-center gap-2 border-t border-line p-3">
-          <Button variant="ghost" className="flex-1 justify-start" onClick={() => useUi.getState().open("settings")}>
+        <div className="flex items-center gap-2 border-t border-line px-2 py-1.5">
+          <Button variant="ghost" className="flex-1 justify-start py-1" onClick={() => useUi.getState().open("settings")}>
             <KeyRound size={14} /> {t("home.aiSettings")}
           </Button>
           <LanguageToggle />
         </div>
         <button
-          className="flex items-center justify-between border-t border-line px-4 py-2 text-[10px] text-muted hover:text-text disabled:opacity-60"
+          className="flex items-center justify-between border-t border-line px-3 py-1 text-[10px] text-muted hover:text-text disabled:opacity-60"
           onClick={manualUpdateCheck}
           disabled={checkingUpdate}
           title={t("update.check")}
@@ -293,6 +292,7 @@ export function Home() {
 function AiCard({ workspace }: { workspace: Workspace }) {
   const t = useT();
   const [prompt, setPrompt] = useState("");
+  const [title, setTitle] = useState("");
   const [size, setSize] = useState(SIZE_PRESETS[0].id);
   const [busy, setBusy] = useState(false);
   const generate = async () => {
@@ -300,7 +300,8 @@ function AiCard({ workspace }: { workspace: Workspace }) {
     setBusy(true);
     try {
       const p = SIZE_PRESETS.find((x) => x.id === size)!;
-      await createDesign({ width: p.width, height: p.height, name: prompt.trim().slice(0, 40), workspaceId: workspace.id });
+      // Without a title the AI names the design once it knows what it is.
+      await createDesign({ width: p.width, height: p.height, name: title.trim() || t("home.untitled"), workspaceId: workspace.id });
       useUi.getState().setRightTab("ai");
       void sendChat(prompt);
     } catch (e) {
@@ -313,19 +314,21 @@ function AiCard({ workspace }: { workspace: Workspace }) {
     <section className="rounded-2xl border border-line bg-gradient-to-br from-accent-2/25 via-panel to-accent/10 p-5">
       <h2 className="flex items-center gap-2 text-[17px] font-semibold"><Sparkles size={18} className="text-accent" /> {t("home.aiTitle")}</h2>
       <p className="mt-1 text-[12px] text-muted">{t("home.aiSubWs", { name: workspace.name })}</p>
+      <input
+        className="field mt-3 text-[13px]"
+        placeholder={t("home.aiTitlePlaceholder")}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
       <textarea
-        className="field mt-3 min-h-20 resize-none text-[13px]"
+        className="field mt-2 min-h-20 resize-none text-[13px]"
         placeholder={t("home.aiPlaceholderWs")}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && void generate()}
       />
+      <SizeTiles className="mt-3 grid-cols-4 sm:grid-cols-7" value={size} onChange={setSize} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select className="field w-56" value={size} onChange={(e) => setSize(e.target.value)}>
-          {SIZE_PRESETS.map((p) => (
-            <option key={p.id} value={p.id}>{t(`size.${p.id}` as "size.custom")} · {p.width}×{p.height}</option>
-          ))}
-        </select>
         <div className="w-64"><ModelPicker /></div>
         <div className="flex-1" />
         <Button variant="primary" disabled={!prompt.trim() || busy} onClick={generate}>
@@ -333,6 +336,29 @@ function AiCard({ workspace }: { workspace: Workspace }) {
         </Button>
       </div>
     </section>
+  );
+}
+
+/** Size presets as tiles whose outline shows each format's proportions. */
+function SizeTiles({ value, onChange, className = "" }: { value: string | null; onChange(id: string): void; className?: string }) {
+  const t = useT();
+  return (
+    <div className={`grid gap-2 ${className}`}>
+      {SIZE_PRESETS.map((p) => {
+        const k = 36 / Math.max(p.width, p.height);
+        return (
+          <button
+            key={p.id}
+            onClick={() => onChange(p.id)}
+            className={`flex flex-col items-center gap-1.5 rounded-lg border p-2.5 ${value === p.id ? "border-accent bg-accent/10 text-accent" : "border-line hover:border-muted"}`}
+          >
+            <div className="flex h-9 items-center"><div className="rounded-sm border border-current" style={{ width: p.width * k, height: p.height * k }} /></div>
+            <span className="text-center text-[11px] text-text">{t(`size.${p.id}` as "size.custom")}</span>
+            <span className="-mt-1 text-[10px] text-muted">{p.width}×{p.height}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -364,22 +390,7 @@ function NewDesignDialog({ workspace, onClose }: { workspace: Workspace; onClose
         </label>
         <div>
           <span className="label">{t("insp.size")}</span>
-          <div className="grid grid-cols-4 gap-2">
-            {SIZE_PRESETS.map((p) => {
-              const k = 36 / Math.max(p.width, p.height);
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => (setSize(p.id), setTemplate(null))}
-                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-2.5 ${!template && size === p.id ? "border-accent bg-accent/10" : "border-line hover:border-muted"}`}
-                >
-                  <div className="flex h-9 items-center"><div className="rounded-sm border border-current" style={{ width: p.width * k, height: p.height * k }} /></div>
-                  <span className="text-[11px]">{t(`size.${p.id}` as "size.custom")}</span>
-                  <span className="-mt-1 text-[10px] text-muted">{p.width}×{p.height}</span>
-                </button>
-              );
-            })}
-          </div>
+          <SizeTiles className="grid-cols-4" value={template ? null : size} onChange={(id) => (setSize(id), setTemplate(null))} />
         </div>
         <div>
           <span className="label">{t("home.orTemplate")}</span>

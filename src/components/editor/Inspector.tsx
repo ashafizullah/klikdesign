@@ -8,7 +8,8 @@ import type { El, Fill, ImageEl, ShapeEl, Shadow, TextEl } from "../../types/des
 import { SIZE_PRESETS, isGradient, solidOf } from "../../types/design";
 import { useDesign } from "../../store/design";
 import { useUi } from "../../store/ui";
-import { FONTS, ensureFont, fontInfo, nearestWeight } from "../../lib/fonts";
+import { ensureFont, fontInfo, nearestWeight } from "../../lib/fonts";
+import { FontPicker } from "../ui/FontPicker";
 import { bounds, textHeight } from "../../lib/geometry";
 import { textLines } from "../../lib/stage";
 import { useT } from "../../i18n";
@@ -147,18 +148,7 @@ function TextProps({ el }: { el: TextEl }) {
   return (
     <Section title={t("insp.text")}>
       <textarea className="field min-h-16 resize-y" value={el.text} onChange={(e) => p({ text: e.target.value })} />
-      <select
-        className="field"
-        value={el.fontFamily}
-        style={{ fontFamily: `"${el.fontFamily}"` }}
-        onChange={(e) => {
-          const family = e.target.value;
-          void ensureFont(family);
-          p({ fontFamily: family, fontWeight: nearestWeight(family, el.fontWeight), italic: fontInfo(family)?.italic ? el.italic : undefined });
-        }}
-      >
-        {FONTS.map((f) => <option key={f.family} value={f.family}>{f.family}</option>)}
-      </select>
+      <FontPicker value={el.fontFamily} onChange={(family) => p(fontPatch(el, family))} />
       <div className="grid grid-cols-2 gap-2">
         <NumberField label={t("insp.fontSize")} value={el.fontSize} step={1} min={4} max={2000} onChange={(fontSize) => p({ fontSize })} suffix="px" />
         <label className="block">
@@ -184,6 +174,12 @@ function TextProps({ el }: { el: TextEl }) {
       <StrokeProps stroke={el.stroke} width={el.strokeWidth} onChange={(stroke, strokeWidth) => p({ stroke, strokeWidth })} />
     </Section>
   );
+}
+
+/** Switches a text element's font, keeping the closest weight and italic the family has. */
+export function fontPatch(el: TextEl, family: string): Partial<TextEl> {
+  void ensureFont(family);
+  return { fontFamily: family, fontWeight: nearestWeight(family, el.fontWeight), italic: fontInfo(family)?.italic ? el.italic : undefined };
 }
 
 function ShapeProps({ el }: { el: ShapeEl }) {

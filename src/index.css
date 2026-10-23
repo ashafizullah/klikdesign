@@ -73,3 +73,14 @@ select {
   background-image: radial-gradient(#23252a 1px, transparent 1px);
   background-size: 18px 18px;
 }
+
+/* Number fields show a unit suffix where the spin buttons would sit; arrow keys still step. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

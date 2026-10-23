@@ -37,9 +37,11 @@ function cached(key: string, fetchBytes: () => Promise<ArrayBuffer>): Promise<HT
   return p;
 }
 
+/** Loads `path`; an empty path loads nothing. */
 export function useImage(path: string): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
+    if (!path) return setImg(null);
     let live = true;
     loadImage(path).then((i) => live && setImg(i), () => live && setImg(null));
     return () => void (live = false);

@@ -5,7 +5,7 @@ import { notifyError, useUi } from "../../store/ui";
 import { useT } from "../../i18n";
 import { Button } from "../ui";
 
-/** Lets the user add KlikReel's MCP server to their own Claude Code; the app only shows the command. */
+/** Lets the user add KlikDesign's MCP server to their own Claude Code; the app only shows the command. */
 export function McpConnect() {
   const t = useT();
   const { enabled, info, setEnabled } = useMcp();

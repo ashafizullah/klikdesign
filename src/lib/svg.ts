@@ -2,7 +2,7 @@
 // text lines (as the canvas laid them out) and image data URIs.
 import type { Design, El, Fill, Shadow } from "../types/design";
 import { isGradient } from "../types/design";
-import { cssUrl, fontInfo } from "./fonts";
+import { cssUrl, googleFont } from "./fonts";
 import { gradientPoints, polygonPoints, textHeight } from "./geometry";
 
 export interface SvgInputs {
@@ -90,7 +90,7 @@ export function designToSvg(d: Design, inputs: SvgInputs): string {
 
   const bg = paint(d.background, d.width, d.height);
   const fonts = [...new Set(d.elements.flatMap((e) => (e.type === "text" ? [e.fontFamily] : [])))]
-    .map(fontInfo)
+    .map(googleFont)
     .filter((f) => !!f)
     .map((f) => `@import url('${esc(cssUrl(f))}');`)
     .join("");

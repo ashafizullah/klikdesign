@@ -4,7 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import type { Design, El, Fill } from "../../types/design";
 import { isGradient } from "../../types/design";
 import { polygonPoints } from "../../lib/geometry";
-import { ensureFonts } from "../../lib/fonts";
+import { ensureFont, ensureFonts } from "../../lib/fonts";
+import { useImage } from "../../lib/images";
 
 export const cssFill = (f: Fill) => (isGradient(f) ? `linear-gradient(${f.angle + 90}deg, ${f.colors.join(", ")})` : f);
 
@@ -86,6 +87,64 @@ export function DesignPreview({ design, className = "" }: { design: Design; clas
           {design.elements.map((e) => <Item key={e.id} e={e} />)}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Relative luminance (0–1) of a #rgb/#rrggbb color; mid-grey for anything else. */
+function luminance(c: string): number {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+  if (!m) return 0.5;
+  const hex = m[1].length === 3 ? [...m[1]].map((x) => x + x).join("") : m[1];
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Small preview of one element (layers list): the image, the shape in its colors, or "Aa" in the text's font. */
+export function ElementThumb({ e, size = 32 }: { e: El; size?: number }) {
+  const img = useImage(e.type === "image" ? e.src : "");
+  useEffect(() => void (e.type === "text" && ensureFont(e.fontFamily)), [e]);
+  const color = e.type === "image" ? "#888" : e.type === "shape" && e.shape === "line" ? (e.stroke ?? "#888") : isGradient(e.fill) ? e.fill.colors[0] : e.fill;
+  // Light marks get a dark tile and dark marks a light one, so every layer stays visible.
+  const bg = luminance(color) > 0.55 ? "#1f2023" : "#e7e7ea";
+  const box: CSSProperties = { width: size, height: size, background: bg };
+  if (e.type === "image") {
+    return (
+      <div className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-line" style={box}>
+        {img && <img src={img.src} alt="" className="max-h-full max-w-full object-contain" draggable={false} />}
+      </div>
+    );
+  }
+  if (e.type === "text") {
+    const grad = isGradient(e.fill);
+    return (
+      <div className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-line" style={box}>
+        <span
+          style={{
+            fontFamily: `"${e.fontFamily}"`,
+            fontWeight: e.fontWeight,
+            fontStyle: e.italic ? "italic" : undefined,
+            fontSize: size * 0.5,
+            lineHeight: 1,
+            color: grad ? "transparent" : (e.fill as string),
+            background: grad ? cssFill(e.fill) : undefined,
+            backgroundClip: grad ? "text" : undefined,
+            WebkitTextStroke: e.stroke && e.strokeWidth ? `1px ${e.stroke}` : undefined,
+          }}
+        >
+          Aa
+        </span>
+      </div>
+    );
+  }
+  const inner = size - 8;
+  const k = inner / Math.max(e.w, e.h, 1);
+  const shape = { ...e, x: 0, y: 0, rotation: 0, opacity: 1, hidden: false, strokeWidth: e.strokeWidth && Math.max(e.strokeWidth, 2 / k) };
+  return (
+    <div className="relative shrink-0 overflow-hidden rounded border border-line" style={box}>
+      <div style={{ position: "absolute", left: (size - e.w * k) / 2, top: (size - e.h * k) / 2, width: e.w, height: e.h, transform: `scale(${k})`, transformOrigin: "top left" }}>
+        <Item e={shape} />
+      </div>
     </div>
   );
 }

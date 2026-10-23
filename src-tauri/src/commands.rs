@@ -1,5 +1,5 @@
 //! Tauri command surface exposed to the webview.
-use crate::ai::{self, ChatRequest, ChatResult};
+use crate::ai::{self, ChatRequest, ChatResult, ModelsRequest};
 use crate::error::{AppError, AppResult};
 use crate::library::{DesignMeta, Library, Workspace};
 use crate::{keys, workspace};
@@ -41,6 +41,18 @@ pub async fn ai_chat(request: ChatRequest, on_event: Channel<AiStreamEvent>) -> 
     ai::chat(&request, &mut sink).await
 }
 
+#[tauri::command]
+pub async fn ai_models(request: ModelsRequest) -> AppResult<Vec<String>> {
+    ai::models(&request).await
+}
+
+// ---- fonts ------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn system_fonts() -> AppResult<Vec<crate::fonts::SystemFont>> {
+    tokio::task::spawn_blocking(crate::fonts::list).await.map_err(|e| AppError::msg(e.to_string()))
+}
+
 // ---- library ----------------------------------------------------------------
 
 #[tauri::command]
@@ -67,6 +79,11 @@ pub fn design_delete(id: String, lib: State<'_, Library>) -> AppResult<()> {
 #[tauri::command]
 pub fn media_import(id: String, path: String, lib: State<'_, Library>) -> AppResult<String> {
     lib.import_media(&id, &path)
+}
+
+#[tauri::command]
+pub fn media_list(id: String, lib: State<'_, Library>) -> AppResult<Vec<String>> {
+    lib.list_media(&id)
 }
 
 /// Raw image bytes. Loading them as a blob keeps the canvas untainted, so it can be exported.

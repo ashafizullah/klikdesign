@@ -9,10 +9,10 @@ import { SIZE_PRESETS } from "../types/design";
 import { useDesign } from "../store/design";
 import { useApp } from "../store/app";
 import { useChat } from "../store/chat";
-import { describe, designGuide, exec as execDesignTool, tools as designTools } from "./agent";
+import { addImage, describe, designGuide, exec as execDesignTool, tools as designTools } from "./agent";
+import { mediaChanged } from "./media";
 import { buildExport, type ExportFormat } from "./export";
 import { createDesign, leaveDesign, loadDesign } from "./library";
-import { loadImage } from "./images";
 import { ipc, type ToolDef } from "./ipc";
 import { WithImage, type ToolArgs } from "./toolLoop";
 
@@ -30,9 +30,10 @@ Workflow:
 1. If no design is open, or the user means another one, use list_designs, then open_design or create_design. The workspace whose path matches your working directory is usually the right one.
 2. Call get_design_guide once: it has the page size, the element model, the fonts you may use and the design rules. Follow it.
 3. get_design before editing; never invent element ids.
-4. Build or revise with set_canvas, add_elements, update_elements, remove_elements and reorder. Place pictures with place_image (any file on this computer) or place_project_image (from the linked project folder).
+4. Build or revise with set_canvas, add_elements, update_elements, remove_elements and reorder. Place pictures with place_design_image (images the user already added to this design; see list_design_images), place_image (any file on this computer) or place_project_image (from the linked project folder).
 5. view_design after a build or larger change, and fix overlaps, cut-off text, poor contrast or awkward spacing.
-6. export_design when the user asks for a file.
+6. Give an untitled design a short title with rename_design.
+7. export_design when the user asks for a file.
 
 The user's product codebase is usually your current working directory: read it for real names, wording, brand colors and logos.`;
 
@@ -70,7 +71,6 @@ const TOOLS: ToolDef[] = [
     description: "Copies an image file from this computer into the design and places it. Give w (and optionally h; by default it keeps its aspect ratio). Returns the element id.",
     parameters: obj({ path: { ...str, description: "Absolute path to a PNG, JPG, WebP, GIF or SVG" }, x: num, y: num, w: num, h: num, cornerRadius: num, name: str }, ["path", "x", "y", "w"]),
   },
-  { name: "rename_design", description: "Renames the open design.", parameters: obj({ name: str }, ["name"]) },
   {
     name: "export_design",
     description: "Exports the open design to a file. scale multiplies the page size (default 1; 2 for print-quality PNG/PDF).",
@@ -111,14 +111,8 @@ async function placeImage(a: ToolArgs) {
   const path = String(a.path ?? "");
   if (!/^(\/|[A-Za-z]:[\\/])/.test(path)) throw new Error("path must be an absolute file path");
   const src = await ipc.mediaImport(useDesign.getState().design.id, path);
-  const img = await loadImage(src);
-  const w = Math.max(1, n(a.w) ?? 200);
-  const ratio = img.naturalWidth && img.naturalHeight ? img.naturalHeight / img.naturalWidth : 1;
-  const h = n(a.h) && n(a.h)! > 0 ? n(a.h)! : w * ratio;
-  const [id] = useDesign.getState().add([{
-    type: "image", src, x: n(a.x) ?? 0, y: n(a.y) ?? 0, w, h, rotation: 0, opacity: 1, name: s(a.name), cornerRadius: n(a.cornerRadius),
-  }]);
-  return { id, w, h: Math.round(h) };
+  mediaChanged();
+  return addImage(src, a);
 }
 
 async function exportFile(a: ToolArgs) {
@@ -160,10 +154,6 @@ async function run(name: string, a: ToolArgs): Promise<unknown> {
       return describe();
     case "place_image":
       return placeImage(a);
-    case "rename_design":
-      if (!s(a.name)?.trim()) throw new Error("name must not be empty");
-      useDesign.getState().update((d) => void (d.name = s(a.name)!.trim()));
-      return { ok: true };
     case "export_design":
       return exportFile(a);
     default:
@@ -173,7 +163,7 @@ async function run(name: string, a: ToolArgs): Promise<unknown> {
 
 const ALLOWED = new Set(TOOLS.map((t) => t.name));
 const DESIGNLESS = new Set(["list_designs", "open_design", "create_design"]);
-const READ_ONLY = new Set(["list_designs", "get_design_guide", "get_design", "view_design", "list_project_images", "view_project_image"]);
+const READ_ONLY = new Set(["list_designs", "get_design_guide", "get_design", "view_design", "list_project_images", "view_project_image", "list_design_images", "view_design_image", "list_installed_fonts"]);
 
 function toContent(out: unknown): Content[] {
   if (out instanceof WithImage) return [{ type: "text", text: out.content }, { type: "image", data: out.image.data, mimeType: out.image.mediaType }];

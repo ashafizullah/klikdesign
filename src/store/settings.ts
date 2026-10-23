@@ -5,6 +5,13 @@ import { t } from "../i18n";
 import { ipc } from "../lib/ipc";
 
 export type ApiFormat = "openai" | "anthropic";
+export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/** Effort levels each format accepts; OpenAI-compatible APIs stop at high. */
+export const EFFORTS: Record<ApiFormat, Effort[]> = {
+  anthropic: ["low", "medium", "high", "xhigh", "max"],
+  openai: ["low", "medium", "high"],
+};
 
 /** A text-model connection. Its API key lives in the OS keychain under the profile id. */
 export interface AiProfile {
@@ -15,6 +22,8 @@ export interface AiProfile {
   model: string;
   /** The model accepts images, so the AI can look at its own design. */
   vision?: boolean;
+  /** Reasoning effort; unset leaves the provider's default. */
+  effort?: Effort;
 }
 
 export const PROFILE_PRESETS: { label: string; profile: Omit<AiProfile, "id"> }[] = [
@@ -66,7 +75,7 @@ export function activeModel() {
   const s = useSettings.getState();
   const p = s.profiles.find((x) => x.id === s.activeProfileId) ?? s.profiles[0];
   if (!p) throw new Error(t("err.noProfile"));
-  return { format: p.format, profileId: p.id, baseUrl: p.baseUrl || null, model: p.model };
+  return { format: p.format, profileId: p.id, baseUrl: p.baseUrl || null, model: p.model, effort: p.effort ?? null };
 }
 
 /** Whether the app's own AI can run: a key is stored, or the endpoint is local (Ollama and the like). */

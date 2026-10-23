@@ -20,6 +20,10 @@ mockIPC(async (cmd, args) => {
   switch (cmd) {
     case "api_keys_status":
       return Object.fromEntries((a.profileIds ?? []).map((id: string) => [id, true]));
+    case "ai_models":
+      return req.format === "anthropic" ? ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"] : ["gpt-5", "gpt-5-mini"];
+    case "system_fonts":
+      return ["Arial", "Avenir Next", "Georgia", "Helvetica Neue", "Menlo", "Times New Roman"].map((family) => ({ family, weights: [400, 700], italic: true }));
     case "api_key_set":
     case "api_key_delete":
       return null;
@@ -38,6 +42,8 @@ mockIPC(async (cmd, args) => {
       media.set(path, demoSvg(media.size * 70));
       return path;
     }
+    case "media_list":
+      return [...media.keys()].filter((k) => k.startsWith(`/mock/${a.id}/`)).reverse();
     case "media_bytes":
       return (media.get(a.path) ?? demoSvg(200)).buffer;
     case "workspaces_list":

@@ -1,16 +1,16 @@
 // Asset sidebar: templates, text presets, shapes and uploaded images.
 import { Image as ImageIcon, LayoutTemplate, Shapes, Type, Upload } from "lucide-react";
-import { open as openDialog, ask } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
-import type { El, ImageEl } from "../../types/design";
+import type { El } from "../../types/design";
 import { normalizeElement } from "../../types/design";
 import { normalizeDesign, useDesign } from "../../store/design";
-import { notifyError, useUi, type LeftTab } from "../../store/ui";
+import { confirm, notifyError, useUi, type LeftTab } from "../../store/ui";
 import { SHAPE_PRESETS, TEMPLATES, TEXT_PRESETS, placeOnPage } from "../../lib/templates";
 import { ensureFont } from "../../lib/fonts";
 import { ipc } from "../../lib/ipc";
 import { loadImage, loadWorkspaceImage } from "../../lib/images";
+import { IMAGE_EXTS, importImages, mediaChanged, placeImage, useMedia } from "../../lib/media";
 import { workspaceName } from "../../lib/workspace";
 import { polygonPoints } from "../../lib/geometry";
 import { useT } from "../../i18n";
@@ -65,7 +65,7 @@ function Templates() {
   const apply = async (id: string) => {
     const tpl = TEMPLATES.find((x) => x.id === id)!;
     const cur = useDesign.getState().design;
-    if (cur.elements.length && !(await ask(t("left.replaceConfirm"), { kind: "warning" }))) return;
+    if (cur.elements.length && !(await confirm({ title: t("left.replaceTitle"), message: t("left.replaceConfirm"), confirmLabel: t("left.replace") }))) return;
     const next = normalizeDesign({ ...structuredClone(tpl.design), id: cur.id, name: cur.name } as never);
     for (const e of next.elements) if (e.type === "text") void ensureFont(e.fontFamily);
     useDesign.getState().update((d) => Object.assign(d, { width: next.width, height: next.height, background: next.background, elements: next.elements }));
@@ -145,17 +145,25 @@ function ShapesTab() {
 
 function Uploads() {
   const t = useT();
-  const images = useDesign(useShallow((s) => s.design.elements.filter((e): e is ImageEl => e.type === "image")));
+  const designId = useDesign((s) => s.design.id);
+  // Reload when images are added or removed on the page, or files are imported.
+  const placed = useDesign((s) => s.design.elements.filter((e) => e.type === "image").length);
+  const version = useMedia((s) => s.version);
+  const [srcs, setSrcs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const srcs = [...new Set(images.map((i) => i.src))];
+  useEffect(() => {
+    let live = true;
+    ipc.mediaList(designId).then((l) => live && setSrcs(l), notifyError);
+    return () => void (live = false);
+  }, [designId, placed, version]);
 
   const upload = async () => {
-    const picked = await openDialog({ multiple: true, filters: [{ name: t("left.images"), extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg"] }] });
+    const picked = await openDialog({ multiple: true, filters: [{ name: t("left.images"), extensions: IMAGE_EXTS }] });
     const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
     if (!paths.length) return;
     setBusy(true);
     try {
-      for (const p of paths) await place(await ipc.mediaImport(useDesign.getState().design.id, p));
+      await importImages(paths);
     } finally {
       setBusy(false);
     }
@@ -166,30 +174,23 @@ function Uploads() {
       <Button variant="primary" className="w-full" disabled={busy} onClick={() => upload().catch(notifyError)}>
         <Upload size={14} /> {t("left.upload")}
       </Button>
+      <div>
+        <div className="label">{t("left.designImages")}</div>
+        {srcs.length === 0 ? (
+          <p className="text-[11px] leading-relaxed text-muted">{t("left.uploadsEmpty")}</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {srcs.map((src) => (
+              <button key={src} onClick={() => placeImage(src).catch(notifyError)} className="overflow-hidden rounded-md border border-line hover:border-accent">
+                <Thumb src={src} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <ProjectImages />
-      {srcs.length === 0 ? (
-        <p className="text-center text-[11px] leading-relaxed text-muted">{t("left.uploadsEmpty")}</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-2">
-          {srcs.map((src) => (
-            <button key={src} onClick={() => place(src).catch(notifyError)} className="overflow-hidden rounded-md border border-line hover:border-accent">
-              <Thumb src={src} />
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
-}
-
-/** Adds an image at its aspect ratio, fitted to half the page. */
-async function place(src: string) {
-  const img = await loadImage(src);
-  const { design, add } = useDesign.getState();
-  const k = Math.min((design.width * 0.6) / img.naturalWidth, (design.height * 0.6) / img.naturalHeight);
-  const w = img.naturalWidth * k;
-  const h = img.naturalHeight * k;
-  add([{ type: "image", src, x: (design.width - w) / 2, y: (design.height - h) / 2, w, h, rotation: 0, opacity: 1 }]);
 }
 
 /** Images from the linked project folder (logo, icons, screenshots). */
@@ -205,7 +206,10 @@ function ProjectImages() {
     return () => void (live = false);
   }, [wsId]);
   if (!wsId) return null;
-  const pick = async (rel: string) => place(await ipc.wsImageImport(useDesign.getState().design.id, wsId, rel));
+  const pick = async (rel: string) => {
+    await placeImage(await ipc.wsImageImport(useDesign.getState().design.id, wsId, rel));
+    mediaChanged();
+  };
   return (
     <div>
       <div className="label">{t("ws.images", { name: workspaceName(wsId) ?? "" })}</div>

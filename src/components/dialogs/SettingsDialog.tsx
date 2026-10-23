@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Check, CircleDot, Loader2, Trash2, Zap } from "lucide-react";
-import { PROFILE_PRESETS, useSettings, type AiProfile, type ApiFormat } from "../../store/settings";
+import { Check, CircleDot, ListRestart, Loader2, Trash2, Zap } from "lucide-react";
+import { EFFORTS, PROFILE_PRESETS, useSettings, type AiProfile, type ApiFormat, type Effort } from "../../store/settings";
 import { notifyError, useUi } from "../../store/ui";
 import { ipc } from "../../lib/ipc";
 import { suggestBaseUrl } from "../../lib/baseUrl";
@@ -120,6 +120,48 @@ function KeyField({ id, hasKey, onChange }: { id: string; hasKey: boolean; onCha
   );
 }
 
+function ModelField({ profile, onChange }: { profile: AiProfile; onChange(model: string): void }) {
+  const t = useT();
+  const [models, setModels] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // A list fetched for another endpoint no longer applies.
+  useEffect(() => setModels(null), [profile.format, profile.baseUrl]);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const ids = await ipc.models({ format: profile.format, profileId: profile.id, baseUrl: profile.baseUrl || null });
+      setModels(ids);
+      if (!ids.length) setError(t("settings.modelsEmpty"));
+    } catch (e) {
+      setError(localizeMessage(String(e)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <label className="block">
+      <span className="label">{t("settings.model")}</span>
+      <div className="flex gap-1.5">
+        <input className="field" value={profile.model} onChange={(e) => onChange(e.target.value)} />
+        <Button className="shrink-0 whitespace-nowrap" onClick={load} disabled={loading} title={t("settings.modelsLoadHint")}>
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <ListRestart size={13} />} {t("settings.modelsLoad")}
+        </Button>
+      </div>
+      {!!models?.length && (
+        <select className="field mt-1.5" value={models.includes(profile.model) ? profile.model : ""} onChange={(e) => e.target.value && onChange(e.target.value)}>
+          <option value="">{t("settings.modelsPick", { n: models.length })}</option>
+          {models.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+      )}
+      {error && <div className="mt-1.5 rounded-md bg-danger/10 px-2 py-1.5 text-[11px] text-danger whitespace-pre-wrap">{error}</div>}
+    </label>
+  );
+}
+
 function TestResult({ value }: { value: string | null }) {
   const t = useT();
   if (!value || value === "run") return null;
@@ -171,6 +213,7 @@ function AiEditor({ profile, hasKey, onKeyChange }: { profile: AiProfile; hasKey
         profileId: profile.id,
         baseUrl: profile.baseUrl || null,
         model: profile.model,
+        effort: profile.effort ?? null,
         maxTokens: 512,
         messages: [{ role: "user", content: [{ type: "text", text: "Reply with the single word OK." }] }],
       });
@@ -191,7 +234,14 @@ function AiEditor({ profile, hasKey, onKeyChange }: { profile: AiProfile; hasKey
         </label>
         <label className="block">
           <span className="label">{t("settings.format")}</span>
-          <select className="field" value={profile.format} onChange={(e) => update({ format: e.target.value as ApiFormat })}>
+          <select
+            className="field"
+            value={profile.format}
+            onChange={(e) => {
+              const format = e.target.value as ApiFormat;
+              update({ format, effort: profile.effort && EFFORTS[format].includes(profile.effort) ? profile.effort : undefined });
+            }}
+          >
             <option value="openai">{t("settings.openaiCompatible")}</option>
             <option value="anthropic">{t("settings.anthropic")}</option>
           </select>
@@ -202,9 +252,14 @@ function AiEditor({ profile, hasKey, onKeyChange }: { profile: AiProfile; hasKey
         placeholder={profile.format === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com/v1"}
         onChange={(baseUrl) => update({ baseUrl })}
       />
+      <ModelField profile={profile} onChange={(model) => update({ model })} />
       <label className="block">
-        <span className="label">{t("settings.model")}</span>
-        <input className="field" value={profile.model} onChange={(e) => update({ model: e.target.value })} />
+        <span className="label">{t("settings.effort")}</span>
+        <select className="field" value={profile.effort ?? ""} onChange={(e) => update({ effort: (e.target.value || undefined) as Effort | undefined })}>
+          <option value="">{t("settings.effortDefault")}</option>
+          {EFFORTS[profile.format].map((e) => <option key={e} value={e}>{t(`settings.effort.${e}`)}</option>)}
+        </select>
+        <span className="mt-1 block text-[10px] text-muted">{t("settings.effortHint")}</span>
       </label>
       <KeyField id={profile.id} hasKey={hasKey} onChange={onKeyChange} />
       <label className="flex items-center gap-2 text-[12px]">

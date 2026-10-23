@@ -1,5 +1,5 @@
 //! OpenAI Chat Completions and compatible APIs (OpenRouter, Ollama, LM Studio, Groq...).
-use super::{ChatRequest, ChatResult, Message, Part, Role, check_status, parse_tool_input, push_text, sse};
+use super::{ChatRequest, ChatResult, Message, ModelsRequest, Part, Role, check_status, parse_tool_input, push_text, sse};
 use crate::error::{AppError, AppResult};
 use crate::keys;
 use serde_json::{Value, json};
@@ -34,6 +34,9 @@ pub fn build_body(req: &ChatRequest) -> Value {
     }
     if let Some(max) = req.max_tokens {
         body["max_completion_tokens"] = json!(max);
+    }
+    if let Some(effort) = req.effort() {
+        body["reasoning_effort"] = json!(effort);
     }
     body
 }
@@ -183,9 +186,39 @@ pub async fn chat(client: &reqwest::Client, req: &ChatRequest, on_text: &mut (dy
     Ok(state.finish())
 }
 
+/// Model ids from GET /models, sorted.
+pub async fn models(client: &reqwest::Client, req: &ModelsRequest) -> AppResult<Vec<String>> {
+    let mut http = client.get(format!("{}/models", base_url(req.base_url.as_deref()))).header("X-Title", "KlikDesign");
+    if let Some(key) = keys::get(&req.profile_id)? {
+        http = http.bearer_auth(key);
+    }
+    let body: Value = check_status(http.send().await?).await?.json().await?;
+    Ok(parse_models(&body))
+}
+
+fn parse_models(body: &Value) -> Vec<String> {
+    let mut ids: Vec<String> = body["data"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        // Gemini reports "models/gemini-2.5-pro"; chat expects the bare id.
+        .filter_map(|m| m["id"].as_str().map(|id| id.strip_prefix("models/").unwrap_or(id).to_string()))
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_model_lists() {
+        let body = json!({ "object": "list", "data": [{ "id": "gpt-5" }, { "id": "models/gemini-2.5-pro" }, { "id": "gpt-5" }, { "object": "model" }] });
+        assert_eq!(parse_models(&body), vec!["gemini-2.5-pro", "gpt-5"]);
+        assert!(parse_models(&json!({ "error": "nope" })).is_empty());
+    }
 
     #[test]
     fn merges_tool_call_fragments() {

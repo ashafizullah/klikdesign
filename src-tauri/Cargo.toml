@@ -36,6 +36,7 @@ tauri-plugin-process = "2"
 portable-pty = "0.9.0"
 base64 = "0.23.1"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "tokio"] }
+fontdb = "0.23"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

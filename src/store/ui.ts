@@ -23,8 +23,18 @@ interface UiState {
   terminal: boolean;
   toggleTerminal(): void;
   toast: { kind: "info" | "error"; text: string } | null;
+  /** Pending in-app confirmation; see `confirm()`. */
+  confirm: (ConfirmOptions & { resolve(ok: boolean): void }) | null;
   open(d: UiState["dialog"]): void;
   notify(text: string, kind?: "info" | "error"): void;
+}
+
+export interface ConfirmOptions {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  /** Styles the confirm button as destructive. */
+  danger?: boolean;
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -44,6 +54,7 @@ export const useUi = create<UiState>()((set) => ({
   terminal: false,
   toggleTerminal: () => set((s) => ({ terminal: !s.terminal })),
   toast: null,
+  confirm: null,
   open: (dialog) => set({ dialog }),
   notify: (text, kind = "info") => {
     clearTimeout(toastTimer);
@@ -54,3 +65,19 @@ export const useUi = create<UiState>()((set) => ({
 
 export const notifyError = (e: unknown) =>
   useUi.getState().notify(localizeMessage(e instanceof Error ? e.message : String(e)), "error");
+
+/** Asks the user to confirm in an in-app dialog; resolves false on cancel. */
+export function confirm(opts: ConfirmOptions): Promise<boolean> {
+  return new Promise((resolve) => {
+    useUi.getState().confirm?.resolve(false);
+    useUi.setState({
+      confirm: {
+        ...opts,
+        resolve: (ok) => {
+          useUi.setState({ confirm: null });
+          resolve(ok);
+        },
+      },
+    });
+  });
+}

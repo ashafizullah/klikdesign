@@ -1,6 +1,7 @@
 mod ai;
 mod commands;
 mod error;
+mod fonts;
 mod keys;
 mod library;
 mod mcp;
@@ -29,11 +30,14 @@ pub fn run() {
             commands::api_key_set,
             commands::api_key_delete,
             commands::ai_chat,
+            commands::ai_models,
+            commands::system_fonts,
             commands::designs_list,
             commands::design_store,
             commands::design_fetch,
             commands::design_delete,
             commands::media_import,
+            commands::media_list,
             commands::media_bytes,
             commands::workspaces_list,
             commands::workspace_add,

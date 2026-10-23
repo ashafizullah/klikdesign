@@ -8,9 +8,15 @@ import { useApp } from "../../store/app";
 import { useT, type Key } from "../../i18n";
 import { Button, IconButton } from "../ui";
 import { ModelPicker } from "../ui/ModelPicker";
+import { Markdown } from "../ui/Markdown";
 
 const TOOL_LABELS: Record<string, Key> = {
   get_design: "tool.get_design",
+  rename_design: "tool.rename_design",
+  list_design_images: "tool.list_design_images",
+  view_design_image: "tool.view_design_image",
+  place_design_image: "tool.place_design_image",
+  list_installed_fonts: "tool.list_installed_fonts",
   set_canvas: "tool.set_canvas",
   clear_design: "tool.clear_design",
   add_elements: "tool.add_elements",
@@ -79,7 +85,7 @@ export function ChatPanel() {
         )}
         {items.map((it, i) => {
           if (it.kind === "user") return <div key={i} className="ml-6 rounded-lg bg-accent-2/20 px-3 py-2 text-[12px] whitespace-pre-wrap select-text">{it.text}</div>;
-          if (it.kind === "assistant") return <div key={i} className="mr-4 text-[12px] leading-relaxed whitespace-pre-wrap select-text">{it.text}</div>;
+          if (it.kind === "assistant") return <Markdown key={i} text={it.text} className="mr-4 text-[12px] leading-relaxed select-text" />;
           if (it.kind === "error")
             return (
               <div key={i} className="flex gap-1.5 rounded-md bg-danger/10 px-2.5 py-2 text-[11px] text-danger">
@@ -129,7 +135,7 @@ export function ChatPanel() {
   );
 }
 
-const READ_ONLY = new Set(["get_design", "view_design", "list_files", "read_file", "search_code", "list_project_images", "view_project_image"]);
+const READ_ONLY = new Set(["get_design", "view_design", "list_files", "read_file", "search_code", "list_project_images", "view_project_image", "list_design_images", "view_design_image", "list_installed_fonts"]);
 
 function toolCount(input: Record<string, unknown>): number {
   const arr = input.elements ?? input.updates ?? input.ids;
