@@ -25,6 +25,15 @@ pub struct ChatRequest {
     pub tools: Vec<ToolDef>,
     #[serde(default)]
     pub max_tokens: Option<u32>,
+    /// Reasoning effort (low | medium | high | xhigh | max); None leaves the provider default.
+    #[serde(default)]
+    pub effort: Option<String>,
+}
+
+impl ChatRequest {
+    pub fn effort(&self) -> Option<&str> {
+        self.effort.as_deref().map(str::trim).filter(|e| !e.is_empty())
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -97,14 +106,39 @@ pub fn validate_base_url(url: Option<&str>) -> AppResult<()> {
     Ok(())
 }
 
+/// Which models a profile's endpoint offers.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelsRequest {
+    pub format: String,
+    pub profile_id: String,
+    #[serde(default)]
+    pub base_url: Option<String>,
+}
+
+fn client() -> AppResult<reqwest::Client> {
+    // A stalled stream would otherwise hang the job forever (cancel is only checked between steps).
+    Ok(reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(20))
+        .read_timeout(std::time::Duration::from_secs(120))
+        .build()?)
+}
+
+/// Lists the model ids the endpoint reports (GET /models).
+pub async fn models(req: &ModelsRequest) -> AppResult<Vec<String>> {
+    validate_base_url(req.base_url.as_deref())?;
+    let client = client()?;
+    match req.format.as_str() {
+        "anthropic" => anthropic::models(&client, req).await,
+        "openai" => openai::models(&client, req).await,
+        f => Err(AppError::msg(format!("Unknown API format: {f}"))),
+    }
+}
+
 /// Streams a chat completion, calling `on_text` for every text delta.
 pub async fn chat(req: &ChatRequest, on_text: &mut (dyn FnMut(&str) + Send)) -> AppResult<ChatResult> {
     validate_base_url(req.base_url.as_deref())?;
-    // A stalled stream would otherwise hang the job forever (cancel is only checked between steps).
-    let client = reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(20))
-        .read_timeout(std::time::Duration::from_secs(120))
-        .build()?;
+    let client = client()?;
     match req.format.as_str() {
         "anthropic" => anthropic::chat(&client, req, on_text).await,
         "openai" => openai::chat(&client, req, on_text).await,

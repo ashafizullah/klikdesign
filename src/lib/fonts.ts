@@ -1,10 +1,12 @@
-// Curated Google Fonts, loaded on demand. Canvas text is measured when it is
-// drawn, so text redraws once a font finishes loading (see `useFonts`).
+// Curated Google Fonts, loaded on demand, plus the fonts installed on this
+// computer. Canvas text is measured when it is drawn, so text redraws once a
+// font finishes loading (see `useFonts`).
 import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface FontInfo {
   family: string;
-  category: "sans" | "serif" | "display" | "script";
+  category: "sans" | "serif" | "display" | "script" | "system";
   weights: number[];
   italic?: boolean;
 }
@@ -32,7 +34,11 @@ export const FONTS: FontInfo[] = [
   { family: "Lobster", category: "script", weights: [400] },
 ];
 
-export const fontInfo = (family: string) => FONTS.find((f) => f.family === family);
+/** A curated Google Font (these embed in SVG exports and are offered to the AI). */
+export const googleFont = (family: string) => FONTS.find((f) => f.family === family);
+
+/** Google Font or installed font with this family name. */
+export const fontInfo = (family: string) => googleFont(family) ?? useFonts.getState().system.find((f) => f.family === family);
 
 /** Closest weight the family actually ships. */
 export function nearestWeight(family: string, weight: number): number {
@@ -48,16 +54,44 @@ export function cssUrl(f: FontInfo): string {
   return `https://fonts.googleapis.com/css2?family=${fam}:${spec}&display=block`;
 }
 
-/** Bumps whenever a font finishes loading so canvas text re-measures. */
-export const useFonts = create<{ version: number }>()(() => ({ version: 0 }));
+interface FontsState {
+  /** Bumps whenever a font finishes loading so canvas text re-measures. */
+  version: number;
+  /** Fonts installed on this computer (empty until `loadSystemFonts`). */
+  system: FontInfo[];
+}
+
+export const useFonts = create<FontsState>()(() => ({ version: 0, system: [] }));
+
+let systemLoad: Promise<void> | undefined;
+
+/** Lists the installed fonts once per session. */
+export function loadSystemFonts(): Promise<void> {
+  systemLoad ??= invoke<{ family: string; weights: number[]; italic: boolean }[]>("system_fonts")
+    .then((list) => {
+      const google = new Set(FONTS.map((f) => f.family));
+      const system = list.filter((f) => !google.has(f.family)).map((f) => ({ ...f, category: "system" as const, weights: f.weights.length ? f.weights : [400] }));
+      useFonts.setState({ system });
+    })
+    .catch(() => {
+      systemLoad = undefined;
+    });
+  return systemLoad;
+}
+
+const bump = () => useFonts.setState((s) => ({ version: s.version + 1 }));
 
 const loading = new Map<string, Promise<void>>();
 
 export function ensureFont(family: string): Promise<void> {
-  const info = fontInfo(family);
-  if (!info) return Promise.resolve();
+  const info = googleFont(family);
   let p = loading.get(family);
-  if (!p) {
+  if (!p && !info) {
+    // Installed fonts need no download; wait for the webview to load the face, then re-measure.
+    p = document.fonts.load(`32px "${family}"`).catch(() => []).then(bump);
+    loading.set(family, p);
+  }
+  if (!p && info) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = cssUrl(info);
@@ -67,10 +101,10 @@ export function ensureFont(family: string): Promise<void> {
       link.onerror = () => resolve();
     })
       .then(() => Promise.all(info.weights.map((w) => document.fonts.load(`${w} 32px "${family}"`).catch(() => []))))
-      .then(() => useFonts.setState((s) => ({ version: s.version + 1 })));
+      .then(bump);
     loading.set(family, p);
   }
-  return p;
+  return p ?? Promise.resolve();
 }
 
 export const ensureFonts = (families: Iterable<string>) => Promise.all([...new Set(families)].map(ensureFont));

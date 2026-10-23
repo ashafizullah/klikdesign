@@ -2,16 +2,29 @@
 // snap guides, marquee selection and in-place text editing.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type Konva from "konva";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Group, Layer, Line, Rect, Stage, Transformer } from "react-konva";
 import { useShallow } from "zustand/react/shallow";
 import type { El, TextEl } from "../../types/design";
 import { useDesign } from "../../store/design";
-import { useUi } from "../../store/ui";
+import { notifyError, useUi } from "../../store/ui";
 import { bounds, snap, type Box, type Guide } from "../../lib/geometry";
 import { registerStage } from "../../lib/stage";
+import { importImages, isImagePath } from "../../lib/media";
 import { ElementNode, fillProps, type NodeHandlers } from "./ElementNode";
+import { TextToolbar } from "./TextToolbar";
 
 const PAD = 48;
+
+/**
+ * Clicking the canvas (not a focusable element) does not always take focus out
+ * of the field that had it (the chat box, a number field, the in-place text
+ * editor) in every webview, and Delete or arrow keys would then go there.
+ */
+function releaseFocus() {
+  const a = document.activeElement;
+  if (a instanceof HTMLElement && a !== document.body) a.blur();
+}
 const TEXT_ANCHORS = ["top-left", "top-right", "bottom-left", "bottom-right", "middle-left", "middle-right"];
 
 export function Canvas() {
@@ -23,6 +36,8 @@ export function Canvas() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [guides, setGuides] = useState<Guide[]>([]);
   const [marquee, setMarquee] = useState<Box | null>(null);
+  /** An element is being dragged; the floating text toolbar hides meanwhile. */
+  const [moving, setMoving] = useState(false);
   const dragOrigin = useRef<Map<string, { x: number; y: number }>>(new Map());
 
   const design = useDesign((s) => s.design);
@@ -46,6 +61,39 @@ export function Canvas() {
 
   const origin = { x: (size.w - design.width * zoom) / 2 + pan.x, y: (size.h - design.height * zoom) / 2 + pan.y };
   const toPage = (p: { x: number; y: number }) => ({ x: (p.x - origin.x) / zoom, y: (p.y - origin.y) / zoom });
+
+  // Image files dropped from the Finder/Explorer are copied into the design and placed where they land.
+  const [dropping, setDropping] = useState(false);
+  const toPageRef = useRef(toPage);
+  toPageRef.current = toPage;
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let live = true;
+    const local = (pos: { x: number; y: number }) => {
+      const r = wrap.current?.getBoundingClientRect();
+      if (!r) return null;
+      const x = pos.x / devicePixelRatio - r.left;
+      const y = pos.y / devicePixelRatio - r.top;
+      return x >= 0 && y >= 0 && x <= r.width && y <= r.height ? { x, y } : null;
+    };
+    getCurrentWebview()
+      .onDragDropEvent(({ payload }) => {
+        if (payload.type === "leave") return setDropping(false);
+        const at = local(payload.position);
+        if (payload.type === "enter" || payload.type === "over") {
+          return setDropping(!!at && (payload.type === "over" || payload.paths.some(isImagePath)));
+        }
+        setDropping(false);
+        const images = payload.paths.filter(isImagePath);
+        if (at && images.length) importImages(images, toPageRef.current(at)).catch(notifyError);
+      })
+      .then((fn) => (live ? (unlisten = fn) : fn()))
+      .catch(() => {}); // not in the Tauri shell (browser preview)
+    return () => {
+      live = false;
+      unlisten?.();
+    };
+  }, []);
 
   // The stage mounts once the viewport has been measured.
   const mounted = size.w > 0;
@@ -74,6 +122,7 @@ export function Canvas() {
   const handlers: NodeHandlers = {
     onPointerDown: (el, e) => {
       e.cancelBubble = true;
+      releaseFocus();
       const store = useDesign.getState();
       const additive = e.evt.shiftKey || e.evt.metaKey;
       if (additive) store.select(store.selected.includes(el.id) ? store.selected.filter((x) => x !== el.id) : [...store.selected, el.id]);
@@ -86,6 +135,7 @@ export function Canvas() {
       }
     },
     onDragStart: (el) => {
+      setMoving(true);
       const store = useDesign.getState();
       const ids = store.selected.includes(el.id) ? store.selected : [el.id];
       dragOrigin.current = new Map(store.design.elements.filter((x) => ids.includes(x.id)).map((x) => [x.id, { x: x.x, y: x.y }]));
@@ -112,6 +162,7 @@ export function Canvas() {
       }
     },
     onDragEnd: () => {
+      setMoving(false);
       setGuides([]);
       const stage = stageRef.current;
       const patches = [...dragOrigin.current.keys()].flatMap((id) => {
@@ -164,6 +215,7 @@ export function Canvas() {
   }, []);
 
   const onStageDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    releaseFocus();
     const p = stageRef.current?.getPointerPosition();
     if (!p) return;
     if (spaceDown || e.evt.button === 1) {
@@ -276,7 +328,11 @@ export function Canvas() {
           </Layer>
         </Stage>
       )}
+      {dropping && <div className="pointer-events-none absolute inset-2 z-30 rounded-xl border-2 border-dashed border-accent bg-accent/5" />}
       {editing && <TextEditor el={editing} origin={origin} zoom={zoom} />}
+      {onlyText && !editing && !moving && !marquee && !sel[0].locked && (
+        <TextToolbar el={sel[0] as TextEl} />
+      )}
     </div>
   );
 }
@@ -296,7 +352,9 @@ function TextEditor({ el, origin, zoom }: { el: TextEl; origin: { x: number; y: 
     ta.style.height = `${ta.scrollHeight}px`;
   }, [value, zoom]);
   const commit = () => {
-    if (value !== el.text) useDesign.getState().patch(el.id, { text: value });
+    // Emptying a text box while editing it removes it, as in other editors.
+    if (!value.trim()) useDesign.getState().remove([el.id]);
+    else if (value !== el.text) useDesign.getState().patch(el.id, { text: value });
     useUi.getState().setEditingText(null);
   };
   const color = typeof el.fill === "string" ? el.fill : el.fill.colors[0];

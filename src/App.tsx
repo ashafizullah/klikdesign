@@ -7,12 +7,14 @@ import { RightPanel } from "./components/editor/RightPanel";
 import { SettingsDialog } from "./components/dialogs/SettingsDialog";
 import { ExportDialog } from "./components/dialogs/ExportDialog";
 import { UpdateDialog } from "./components/dialogs/UpdateDialog";
+import { ConfirmDialog } from "./components/dialogs/ConfirmDialog";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import { TooltipLayer } from "./components/ui/TooltipLayer";
 import { useUi } from "./store/ui";
 import { useApp } from "./store/app";
 import { useShortcuts } from "./lib/shortcuts";
 import { useT } from "./i18n";
+import { loadSystemFonts } from "./lib/fonts";
 import "./lib/mcp";
 
 const TerminalPanel = lazy(() => import("./components/terminal/TerminalPanel"));
@@ -33,6 +35,7 @@ function TerminalSlot() {
 
 export default function App() {
   useShortcuts();
+  useEffect(() => void loadSystemFonts(), []);
   const t = useT();
   const view = useApp((s) => s.view);
   const dialog = useUi((s) => s.dialog);
@@ -55,6 +58,7 @@ export default function App() {
       {dialog === "settings" && <SettingsDialog />}
       {dialog === "export" && <ExportDialog />}
       <UpdateDialog />
+      <ConfirmDialog />
       <TooltipLayer />
       {toast && (
         <div

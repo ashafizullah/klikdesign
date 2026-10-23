@@ -198,11 +198,28 @@ impl Library {
         if !IMAGE_EXTS.contains(&ext.as_str()) {
             return Err(AppError::msg("Not a supported image file"));
         }
-        let dir = self.design_dir(id)?.join("media");
-        std::fs::create_dir_all(&dir)?;
-        let out = dir.join(format!("{}.{ext}", &uuid::Uuid::new_v4().simple().to_string()[..12]));
+        let out = self.new_media_path(id, &ext)?;
         std::fs::copy(src, &out)?;
         Ok(out.to_string_lossy().into_owned())
+    }
+
+    /// Images stored with the design (uploaded, dropped or copied from a project folder), newest first.
+    pub fn list_media(&self, id: &str) -> AppResult<Vec<String>> {
+        let Ok(entries) = std::fs::read_dir(self.design_dir(id)?.join("media")) else { return Ok(vec![]) };
+        let mut files: Vec<(std::time::SystemTime, PathBuf)> = entries
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()).is_some_and(|e| IMAGE_EXTS.contains(&e.to_ascii_lowercase().as_str())))
+            .map(|p| (p.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH), p))
+            .collect();
+        files.sort_by_key(|f| std::cmp::Reverse(f.0));
+        Ok(files.into_iter().map(|(_, p)| p.to_string_lossy().into_owned()).collect())
+    }
+
+    fn new_media_path(&self, id: &str, ext: &str) -> AppResult<PathBuf> {
+        let dir = self.design_dir(id)?.join("media");
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir.join(format!("{}.{ext}", &uuid::Uuid::new_v4().simple().to_string()[..12])))
     }
 }
 
@@ -235,6 +252,8 @@ mod tests {
         let txt = root.join("a.txt");
         std::fs::write(&txt, b"x").unwrap();
         assert!(lib.import_media("dsn_1", txt.to_str().unwrap()).is_err());
+        assert_eq!(lib.list_media("dsn_1").unwrap(), vec![stored.clone()]);
+        assert!(lib.list_media("dsn_none").unwrap().is_empty());
 
         let ws = lib.add_workspace(root.to_str().unwrap(), None).unwrap();
         assert_eq!(lib.add_workspace(root.to_str().unwrap(), None).unwrap().id, ws.id);
