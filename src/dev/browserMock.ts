@@ -5,6 +5,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 const designs = new Map<string, string>();
 const media = new Map<string, Uint8Array>();
 let chatCalls = 0;
+const brands = new Map<string, string>();
 const workspaces = [{ id: "ws_demo", name: "kopi-senja-app", path: "/Users/dev/Projects/kopi-senja-app", createdAt: Date.now() }];
 
 const demoSvg = (hue: number) =>
@@ -53,6 +54,16 @@ mockIPC(async (cmd, args) => {
     case "workspace_remove":
     case "workspace_rename":
       return null;
+    case "brand_get":
+      return brands.get(a.workspaceId) ?? null;
+    case "brand_set":
+      brands.set(a.workspaceId, a.json);
+      return null;
+    case "brand_logo_import": {
+      const path = `/mock/brand/${media.size}.svg`;
+      media.set(path, demoSvg(media.size * 70 + 30));
+      return path;
+    }
     case "ws_overview":
       return "Workspace: kopi-senja-app\nsrc/\npublic/logo.svg\n\n## README.md\n# Kopi Senja\nPesan kopi susu gula aren, antar 15 menit.";
     case "ws_list_files":

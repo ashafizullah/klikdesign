@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
-import { FONTS, ensureFont, loadSystemFonts, useFonts, type FontInfo } from "../../lib/fonts";
+import { FONTS, ensureFont, fontInfo, loadSystemFonts, useFonts, type FontInfo } from "../../lib/fonts";
+import { useBrandKit } from "../../store/brand";
+import { useDesign } from "../../store/design";
 import { useT } from "../../i18n";
 
-/** Searchable font menu: the curated Google Fonts, then the fonts installed on this computer. */
+/** Searchable font menu: the brand kit's fonts, the curated Google Fonts, then the fonts installed on this computer. */
 export function FontPicker({ value, onChange, className = "" }: { value: string; onChange(family: string): void; className?: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const system = useFonts((s) => s.system);
+  const brandFonts = useBrandKit(useDesign((s) => s.design.workspaceId)).fonts;
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     void loadSystemFonts();
-    FONTS.forEach((f) => void ensureFont(f.family));
+    [...brandFonts, ...FONTS.map((f) => f.family)].forEach((f) => void ensureFont(f));
     const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
     window.addEventListener("pointerdown", away);
     return () => window.removeEventListener("pointerdown", away);
@@ -23,11 +26,13 @@ export function FontPicker({ value, onChange, className = "" }: { value: string;
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (f: FontInfo) => !q || f.family.toLowerCase().includes(q);
+    const known = (family: string): FontInfo => fontInfo(family) ?? { family, category: "system", weights: [400, 700] };
     return [
+      { label: t("font.brand"), fonts: brandFonts.map(known).filter(match) },
       { label: t("font.google"), fonts: FONTS.filter(match) },
       { label: t("font.system", { n: system.length }), fonts: system.filter(match) },
     ].filter((g) => g.fonts.length);
-  }, [query, system, t]);
+  }, [query, system, brandFonts, t]);
 
   const pick = (family: string) => {
     onChange(family);

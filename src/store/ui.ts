@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { localizeMessage } from "../i18n";
 
-export type LeftTab = "templates" | "text" | "shapes" | "uploads";
+export type LeftTab = "templates" | "text" | "shapes" | "uploads" | "brand";
 export type RightTab = "design" | "layers" | "ai";
 
 interface UiState {

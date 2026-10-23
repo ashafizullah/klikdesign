@@ -123,6 +123,26 @@ fn ws_root(lib: &Library, workspace_id: &str) -> AppResult<String> {
 }
 
 #[tauri::command]
+pub fn brand_get(workspace_id: String, lib: State<'_, Library>) -> AppResult<Option<String>> {
+    lib.brand(&workspace_id)
+}
+
+#[tauri::command]
+pub fn brand_set(workspace_id: String, json: String, lib: State<'_, Library>) -> AppResult<()> {
+    lib.save_brand(&workspace_id, &json)
+}
+
+/// Copies a logo (any file the user picked, or `rel` inside the project folder) into the brand kit.
+#[tauri::command]
+pub fn brand_logo_import(workspace_id: String, path: Option<String>, rel: Option<String>, lib: State<'_, Library>) -> AppResult<String> {
+    match (path, rel) {
+        (Some(path), None) => lib.import_brand_logo(&workspace_id, &path),
+        (None, Some(rel)) => lib.import_brand_logo_from_workspace(&workspace_id, &rel),
+        _ => Err(AppError::msg("give either path or rel")),
+    }
+}
+
+#[tauri::command]
 pub fn ws_overview(workspace_id: String, lib: State<'_, Library>) -> AppResult<String> {
     workspace::overview(&ws_root(&lib, &workspace_id)?)
 }

@@ -9,6 +9,7 @@ import { FONTS, ensureFonts, fontInfo, loadSystemFonts, nearestWeight, useFonts 
 import { mediaChanged } from "./media";
 import { resizeLayout } from "./resize";
 import { useUi } from "../store/ui";
+import { brandOf, isEmptyBrand, loadBrand, normalizeBrand, updateBrand } from "../store/brand";
 import { renderPage, textLines } from "./stage";
 import { ipc } from "./ipc";
 import { linkedWorkspace } from "./workspace";
@@ -18,8 +19,10 @@ import { textHeight } from "./geometry";
 import { runToolLoop, WithImage, type ToolArgs } from "./toolLoop";
 
 /** Design rules and reference for a model that edits the page through `tools()`. */
-export function designGuide(): string {
-  const linked = !!linkedWorkspace(useDesign.getState().design.workspaceId);
+export async function designGuide(): Promise<string> {
+  const ws = linkedWorkspace(useDesign.getState().design.workspaceId);
+  if (ws) await loadBrand(ws.id).catch(() => {});
+  const linked = !!ws;
   return system(true, null) +
     (linked
       ? "\n\nA project folder is linked to this design: find its logo and screenshots with list_project_images, look at them with view_project_image and place them with place_project_image."
@@ -53,17 +56,35 @@ How to work:
 3. Design like a professional: a clear hierarchy (one dominant headline, large and bold), generous margins (at least 6% of the page width), aligned edges, consistent spacing, at most two font families, a limited palette of 2–4 colors with strong contrast for text. Decorative shapes should support the layout, not clutter it. Keep every element inside the page unless it is a deliberate bleed.
 4. Write copy in the user's language. Use real, specific wording from the brief; invent plausible details (date, place, price) only when the user did not give them and the poster needs them.
 5. To revise, change only what the user asked for, with update_elements; keep the rest.${vision ? "\n6. After building or a larger change, call view_design to look at the result and fix overlaps, cut-off text, poor contrast or awkward spacing." : ""}
-${isUntitled(name) ? "The design has no title yet: once you know what it is about, call rename_design with a short title (2–5 words) in the user's language.\n" : ""}Finish with one or two sentences, in the user's language, summarising what you made or changed.${project ? projectSection(project, vision) : ""}`;
+${brandSection()}${isUntitled(name) ? "The design has no title yet: once you know what it is about, call rename_design with a short title (2–5 words) in the user's language.\n" : ""}Finish with one or two sentences, in the user's language, summarising what you made or changed.${project ? projectSection(project, vision) : ""}`;
+}
+
+/** The linked workspace's brand kit, as rules for the model (empty when there is none). */
+function brandSection(): string {
+  const kit = brandOf(useDesign.getState().design.workspaceId);
+  if (isEmptyBrand(kit)) return "";
+  const lines = [
+    kit.colors.length && `- colors: ${kit.colors.join(", ")} — build the palette from these (tints and black/white are fine)`,
+    kit.fonts.length && `- fonts: ${kit.fonts.join(", ")} — use these for headings and body`,
+    kit.logos.length && `- logos (place with place_brand_logo): ${kit.logos.join(", ")}`,
+    kit.voice && `- voice and guidelines: ${kit.voice}`,
+  ].filter(Boolean);
+  return `\n## Brand kit\nThis design belongs to a brand with a saved kit. Follow it unless the user asks otherwise:\n${lines.join("\n")}\n\n`;
 }
 
 function projectSection(overview: string, vision: boolean): string {
+  const kit = brandOf(useDesign.getState().design.workspaceId);
+  const brandResearch = isEmptyBrand(kit)
+    ? `- brand colors and fonts (Tailwind config, CSS variables, theme files) — base the palette on them;
+- the logo and good screenshots: call list_project_images${vision ? ", look at candidates with view_project_image" : ""}, and place the logo (and a screenshot when it helps) with place_project_image.
+The brand kit is still empty: once you know the brand, save it with update_brand_kit (colors, fonts, the logo's project path, a one-line voice) so later designs reuse it.`
+    : `- the brand kit above already has the colors, fonts${kit.logos.length ? " and logo" : ""}; do not research them again. Use list_project_images only for screenshots or when the kit has no logo.`;
   return `
 
 ## Linked project folder
 The poster is for the product in this folder. Before designing, research it with list_files, read_file and search_code (read-only):
 - the product name, tagline, what it does and its key benefits, in the wording the product itself uses (README, landing page copy, i18n files);
-- brand colors and fonts (Tailwind config, CSS variables, theme files) — base the palette on them;
-- the logo and good screenshots: call list_project_images${vision ? ", look at candidates with view_project_image" : ""}, and place the logo (and a screenshot when it helps) with place_project_image.
+${brandResearch}
 Do not quote code, file paths, secrets or internal details on the poster. Keep the research short (a handful of calls), then design.
 
 ${overview}`;
@@ -153,6 +174,22 @@ export function tools(vision: boolean, project: boolean): ToolDef[] {
       },
     );
     if (vision) list.push({ name: "view_project_image", description: "Shows you an image from the project folder.", parameters: obj({ path: str }, ["path"]) });
+    list.push(
+      {
+        name: "update_brand_kit",
+        description: "Saves the brand kit shared by every design of this project: colors (hex), font families, logos (paths inside the project folder, copied into the kit) and a short note on voice. Values are added to the kit; set replace to overwrite it.",
+        parameters: obj({
+          colors: { type: "array", items: str }, fonts: { type: "array", items: str },
+          logos_from_project: { type: "array", items: str, description: "Image paths relative to the project root" },
+          voice: str, replace: { type: "boolean" },
+        }),
+      },
+      {
+        name: "place_brand_logo",
+        description: "Places a logo from the brand kit (a path listed in the Brand kit section). Give w (and optionally h; by default it keeps its aspect ratio). Returns the element id.",
+        parameters: obj({ path: str, x: num, y: num, w: num, h: num, name: str }, ["path", "x", "y", "w"]),
+      },
+    );
   }
   return list;
 }
@@ -299,6 +336,25 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
       if (!list.length) return q ? `no installed font matches "${q}"` : "no installed fonts found";
       return list.slice(0, 400).map((f) => `${f.family} (weights ${f.weights.join("/")}${f.italic ? "; italic" : ""})`).join("\n");
     }
+    case "update_brand_kit": {
+      const id = ws();
+      const imported: string[] = [];
+      for (const rel of Array.isArray(a.logos_from_project) ? a.logos_from_project.map(String) : []) imported.push(await ipc.brandLogoImport(id, { rel }));
+      const list = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+      const kit = await updateBrand(id, (k) =>
+        a.replace === true
+          ? normalizeBrand({ colors: list(a.colors), fonts: list(a.fonts), logos: imported.length ? imported : k.logos, voice: typeof a.voice === "string" ? a.voice : "" })
+          : normalizeBrand({ colors: [...k.colors, ...list(a.colors)], fonts: [...k.fonts, ...list(a.fonts)], logos: [...k.logos, ...imported], voice: typeof a.voice === "string" && a.voice.trim() ? a.voice : k.voice }),
+      );
+      return kit;
+    }
+    case "place_brand_logo": {
+      const path = String(a.path);
+      if (!brandOf(ws()).logos.includes(path)) throw new Error("not a logo of the brand kit; use a path from the Brand kit section");
+      const src = await ipc.mediaImport(store.design.id, path);
+      mediaChanged();
+      return addImage(src, a);
+    }
     case "list_project_images": {
       const imgs = await ipc.wsImages(ws());
       return imgs.length ? imgs.join("\n") : "no images in the project";
@@ -365,6 +421,7 @@ export async function runAgent(history: Message[], cb: AgentCallbacks, signal: {
   const wsId = linkedWorkspace(useDesign.getState().design.workspaceId)?.id;
   // A first look at the linked project, so research starts from the README and file tree.
   const overview = wsId ? await ipc.wsOverview(wsId) : null;
+  if (wsId) await loadBrand(wsId).catch(() => {});
   return asOneStep(() =>
     runToolLoop({ system: system(vision, overview), history, tools: tools(vision, !!overview), exec, signal, maxSteps: overview ? 40 : 24, ...cb }),
   );

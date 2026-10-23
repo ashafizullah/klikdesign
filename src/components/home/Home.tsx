@@ -21,6 +21,7 @@ import { Button, Modal } from "../ui";
 import { LanguageToggle } from "../ui/LanguageToggle";
 import { ModelPicker } from "../ui/ModelPicker";
 import { SizeTiles } from "../ui/SizeTiles";
+import { BrandKitEditor } from "../editor/BrandKit";
 import { ContextMenu, type MenuState } from "../ui/ContextMenu";
 import { TemplateThumb } from "../editor/LeftPanel";
 
@@ -29,6 +30,7 @@ export function Home() {
   const locale = useLocale((s) => s.locale);
   const { designs, workspaces, workspaceId, refresh, selectWorkspace } = useApp();
   const [creating, setCreating] = useState(false);
+  const [brandFor, setBrandFor] = useState<Workspace | null>(null);
   const [renaming, setRenaming] = useState<{ kind: "workspace" | "design"; id: string; name: string } | null>(null);
   const [menu, setMenu] = useState<MenuState>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -213,6 +215,7 @@ export function Home() {
             <p className="truncate text-[11px] text-muted">{ws ? `${ws.path} · ${usage(ws.id)}` : t("home.noFolderSub")}</p>
           </div>
           <div className="flex shrink-0 gap-2">
+            {ws && <Button variant="ghost" onClick={() => setBrandFor(ws)}><Palette size={13} /> {t("brand.button")}</Button>}
             {ws && <Button variant="ghost" onClick={() => removeWorkspace(ws)} title={t("ws.remove")}><Unlink size={13} /></Button>}
             {ws && <Button variant="primary" onClick={() => setCreating(true)}><Plus size={14} /> {t("home.newDesign")}</Button>}
           </div>
@@ -283,6 +286,11 @@ export function Home() {
           onSave={rename}
           onClose={() => setRenaming(null)}
         />
+      )}
+      {brandFor && (
+        <Modal title={t("brand.title", { name: brandFor.name })} onClose={() => setBrandFor(null)} width={480}>
+          <BrandKitEditor workspaceId={brandFor.id} />
+        </Modal>
       )}
       <ContextMenu menu={menu} onClose={closeMenu} />
     </div>

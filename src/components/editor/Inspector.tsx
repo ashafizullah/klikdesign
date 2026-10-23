@@ -10,6 +10,7 @@ import { useDesign } from "../../store/design";
 import { useUi } from "../../store/ui";
 import { ensureFont, fontInfo, nearestWeight } from "../../lib/fonts";
 import { FontPicker } from "../ui/FontPicker";
+import { useBrandKit } from "../../store/brand";
 import { bounds, textHeight } from "../../lib/geometry";
 import { textLines } from "../../lib/stage";
 import { useT } from "../../i18n";
@@ -255,6 +256,7 @@ const SWATCHES = ["#ffffff", "#111111", "#7c5cff", "#22d3c5", "#ff3d9a", "#ffd23
 
 export function FillEditor({ value, onChange }: { value: Fill; onChange(f: Fill): void }) {
   const t = useT();
+  const brand = useBrandKit(useDesign((s) => s.design.workspaceId));
   const grad = isGradient(value);
   return (
     <div className="space-y-2">
@@ -279,6 +281,14 @@ export function FillEditor({ value, onChange }: { value: Fill; onChange(f: Fill)
       ) : (
         <>
           <ColorField value={value} onChange={onChange} />
+          {brand.colors.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="mr-0.5 text-[10px] text-muted">{t("brand.short")}</span>
+              {brand.colors.map((c) => (
+                <button key={c} title={c} onClick={() => onChange(c)} className="h-5 w-5 rounded border border-accent/40" style={{ background: c }} />
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1">
             {SWATCHES.map((c) => (
               <button key={c} title={c} onClick={() => onChange(c)} className="h-5 w-5 rounded border border-line" style={{ background: c }} />
