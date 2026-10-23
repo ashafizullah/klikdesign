@@ -9,7 +9,9 @@ import { SIZE_PRESETS } from "../types/design";
 import { useDesign } from "../store/design";
 import { useApp } from "../store/app";
 import { useChat } from "../store/chat";
-import { addImage, describe, designGuide, exec as execDesignTool, tools as designTools } from "./agent";
+import { addImage, describe, designGuide, exec as execDesignTool, resizeTarget, tools as designTools } from "./agent";
+import { magicResize } from "./magicResize";
+import { t } from "../i18n";
 import { mediaChanged } from "./media";
 import { buildExport, type ExportFormat } from "./export";
 import { createDesign, leaveDesign, loadDesign } from "./library";
@@ -32,8 +34,9 @@ Workflow:
 3. get_design before editing; never invent element ids.
 4. Build or revise with set_canvas, add_elements, update_elements, remove_elements and reorder. Place pictures with place_design_image (images the user already added to this design; see list_design_images), place_image (any file on this computer) or place_project_image (from the linked project folder).
 5. view_design after a build or larger change, and fix overlaps, cut-off text, poor contrast or awkward spacing.
-6. Give an untitled design a short title with rename_design.
-7. export_design when the user asks for a file.
+6. To adapt a design to another format (post to story, banner…), call resize_design (copy: true keeps the original and opens the copy), then re-lay it out with update_elements and check it with view_design.
+7. Give an untitled design a short title with rename_design.
+8. export_design when the user asks for a file.
 
 The user's product codebase is usually your current working directory: read it for real names, wording, brand colors and logos.`;
 
@@ -65,7 +68,13 @@ const TOOLS: ToolDef[] = [
     }, ["name"]),
   },
   { name: "get_design_guide", description: "Returns the page size, element model, available fonts and design rules to follow.", parameters: obj({}) },
-  ...designTools(true, true).filter((t) => !SKIPPED.has(t.name)),
+  ...designTools(true, true)
+    .filter((t) => !SKIPPED.has(t.name))
+    .map((t) =>
+      t.name === "resize_design"
+        ? { ...t, parameters: { ...t.parameters, properties: { ...(t.parameters.properties as object), copy: { type: "boolean", description: "Resize a copy (opened in its place) and keep the original as it is" } } } }
+        : t,
+    ),
   {
     name: "place_image",
     description: "Copies an image file from this computer into the design and places it. Give w (and optionally h; by default it keeps its aspect ratio). Returns the element id.",
@@ -131,6 +140,12 @@ async function run(name: string, a: ToolArgs): Promise<unknown> {
   switch (name) {
     case "list_designs":
       return listDesigns();
+    case "resize_design": {
+      if (a.copy !== true) return execDesignTool(name, a);
+      const { width, height, preset } = resizeTarget(a);
+      await magicResize({ width, height, label: preset ? t(`size.${preset}` as "size.custom") : `${width}×${height}`, copy: true, ai: false });
+      return { designId: useDesign.getState().design.id, ...(describe() as object) };
+    }
     case "open_design": {
       const id = String(a.design_id ?? "");
       if (!(await ipc.designs()).some((d) => d.id === id)) throw new Error(`design ${id} not found; call list_designs`);

@@ -1,12 +1,14 @@
 // Design agent: builds a poster from a prompt and revises it by chat, through
 // element-level tools on the open design.
 import type { El } from "../types/design";
-import { normalizeElement, normalizeFill } from "../types/design";
+import { SIZE_PRESETS, normalizeElement, normalizeFill } from "../types/design";
 import { asOneStep, useDesign, type Reorder } from "../store/design";
 import { activeVision } from "../store/settings";
 import type { Message, ToolDef } from "./ipc";
 import { FONTS, ensureFonts, fontInfo, loadSystemFonts, nearestWeight, useFonts } from "./fonts";
 import { mediaChanged } from "./media";
+import { resizeLayout } from "./resize";
+import { useUi } from "../store/ui";
 import { renderPage, textLines } from "./stage";
 import { ipc } from "./ipc";
 import { linkedWorkspace } from "./workspace";
@@ -114,6 +116,14 @@ export function tools(vision: boolean, project: boolean): ToolDef[] {
   ];
   list.push(
     { name: "rename_design", description: "Renames the open design (its title in the library).", parameters: obj({ name: str }, ["name"]) },
+    {
+      name: "resize_design",
+      description: "Changes the page size and fits the layout to it: backgrounds stretch, other elements scale proportionally and keep their relative place. Then re-lay out for the new format with update_elements (get_design first). Give a size preset or width and height.",
+      parameters: obj({
+        size: { type: "string", enum: SIZE_PRESETS.map((p) => p.id), description: SIZE_PRESETS.map((p) => `${p.id} ${p.width}x${p.height}`).join(", ") },
+        width: num, height: num,
+      }),
+    },
     { name: "list_design_images", description: "Lists the images stored with this design (uploaded or dropped by the user, or copied in earlier), newest first, with their pixel size.", parameters: obj({}) },
     {
       name: "place_design_image",
@@ -204,6 +214,14 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
   switch (name) {
     case "get_design":
       return describe();
+    case "resize_design": {
+      const { width, height } = resizeTarget(a);
+      const next = resizeLayout(store.design, width, height);
+      store.update((d) => Object.assign(d, { width: next.width, height: next.height, elements: next.elements }));
+      useUi.getState().setZoom(null);
+      await settle(next.elements);
+      return describe();
+    }
     case "rename_design": {
       const title = typeof a.name === "string" ? a.name.trim().slice(0, 80) : "";
       if (!title) throw new Error("name must not be empty");
@@ -297,6 +315,15 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
     default:
       throw new Error(`unknown tool: ${name}`);
   }
+}
+
+/** Target size of resize_design: a preset id, or width and height. */
+export function resizeTarget(a: ToolArgs): { width: number; height: number; preset?: string } {
+  const preset = SIZE_PRESETS.find((p) => p.id === a.size);
+  const width = Math.round(preset?.width ?? Number(a.width));
+  const height = Math.round(preset?.height ?? Number(a.height));
+  if (!(width >= 16 && height >= 16 && width <= 10000 && height <= 10000)) throw new Error("give a size preset, or width and height between 16 and 10000");
+  return { width, height, preset: preset?.id };
 }
 
 /** Places a stored image (x, y, w and optional h, cornerRadius, name from the tool input). */

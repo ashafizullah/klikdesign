@@ -18,7 +18,7 @@ interface UiState {
   /** Element whose text is being edited in place. */
   editingTextId: string | null;
   setEditingText(id: string | null): void;
-  dialog: null | "settings" | "export";
+  dialog: null | "settings" | "export" | "resize";
   /** In-app terminal panel visibility. */
   terminal: boolean;
   toggleTerminal(): void;

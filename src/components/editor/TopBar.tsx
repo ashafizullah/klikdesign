@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, KeyRound, Maximize, Minus, Plus, Redo2, SquareTerminal, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, KeyRound, Maximize, Minus, Plus, Redo2, Scaling, SquareTerminal, Undo2 } from "lucide-react";
 import { useStore } from "zustand";
 import logo from "../../assets/logo.png";
 import { redo, undo, useDesign } from "../../store/design";
@@ -55,6 +55,7 @@ export function TopBar() {
       <IconButton title={t("top.terminal")} active={terminal} onClick={() => useUi.getState().toggleTerminal()}><SquareTerminal size={16} /></IconButton>
       <LanguageToggle />
       <Button variant="ghost" onClick={() => open("settings")}><KeyRound size={14} /> {t("home.aiSettings")}</Button>
+      <Button variant="ghost" onClick={() => open("resize")} title={t("resize.hint")}><Scaling size={14} /> {t("resize.button")}</Button>
       <Button variant="primary" onClick={() => open("export")}><Download size={14} /> {t("top.export")}</Button>
     </header>
   );
