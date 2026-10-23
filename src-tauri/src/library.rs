@@ -1,5 +1,6 @@
 //! App-data storage for designs: `designs/<id>/design.json` plus the images
-//! the design uses under `designs/<id>/media`.
+//! the design uses under `designs/<id>/media`, and each workspace's brand kit
+//! under `brands/<workspace id>/` (`brand.json` and copied `logos/`).
 use crate::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -137,6 +138,51 @@ impl Library {
         self.workspaces()?.into_iter().find(|w| w.id == id).ok_or_else(|| AppError::msg("Workspace not found"))
     }
 
+    fn brand_dir(&self, workspace_id: &str) -> AppResult<PathBuf> {
+        self.workspace(workspace_id)?;
+        Ok(self.root.join("brands").join(valid_id(workspace_id)?))
+    }
+
+    /// The workspace's brand kit as JSON, or None when it has none yet.
+    pub fn brand(&self, workspace_id: &str) -> AppResult<Option<String>> {
+        match std::fs::read_to_string(self.brand_dir(workspace_id)?.join("brand.json")) {
+            Ok(s) => Ok(Some(s)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Stores the brand kit; the frontend owns its fields, so any JSON object is accepted.
+    pub fn save_brand(&self, workspace_id: &str, json: &str) -> AppResult<()> {
+        if json.len() > 256 * 1024 || !serde_json::from_str::<Value>(json)?.is_object() {
+            return Err(AppError::msg("Brand kit must be a JSON object under 256 KB"));
+        }
+        let dir = self.brand_dir(workspace_id)?;
+        std::fs::create_dir_all(&dir)?;
+        write_atomic(&dir.join("brand.json"), json)
+    }
+
+    /// Copies a logo into the brand kit's folder; returns the stored path.
+    pub fn import_brand_logo(&self, workspace_id: &str, source: &str) -> AppResult<String> {
+        let src = Path::new(source);
+        let ext = src.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_default();
+        if !IMAGE_EXTS.contains(&ext.as_str()) {
+            return Err(AppError::msg("Not a supported image file"));
+        }
+        let dir = self.brand_dir(workspace_id)?.join("logos");
+        std::fs::create_dir_all(&dir)?;
+        let out = dir.join(format!("{}.{ext}", &uuid::Uuid::new_v4().simple().to_string()[..12]));
+        std::fs::copy(src, &out)?;
+        Ok(out.to_string_lossy().into_owned())
+    }
+
+    /// Copies an image from inside the project folder into the brand kit.
+    pub fn import_brand_logo_from_workspace(&self, workspace_id: &str, rel: &str) -> AppResult<String> {
+        let root = self.workspace(workspace_id)?.path;
+        let src = crate::workspace::resolve(&root, rel)?;
+        self.import_brand_logo(workspace_id, &src.to_string_lossy())
+    }
+
     /// Copies a workspace image into a design's media folder.
     pub fn import_workspace_image(&self, design_id: &str, workspace_id: &str, rel: &str) -> AppResult<String> {
         let root = self.workspace(workspace_id)?.path;
@@ -259,6 +305,14 @@ mod tests {
         assert_eq!(lib.add_workspace(root.to_str().unwrap(), None).unwrap().id, ws.id);
         assert!(lib.import_workspace_image("dsn_1", &ws.id, "a.PNG").unwrap().ends_with(".png"));
         assert!(lib.import_workspace_image("dsn_1", &ws.id, "../x.png").is_err());
+        assert_eq!(lib.brand(&ws.id).unwrap(), None);
+        lib.save_brand(&ws.id, r##"{"colors":["#111"]}"##).unwrap();
+        assert_eq!(lib.brand(&ws.id).unwrap().as_deref(), Some(r##"{"colors":["#111"]}"##));
+        assert!(lib.save_brand(&ws.id, "[1]").is_err());
+        assert!(lib.save_brand("ws_missing", "{}").is_err());
+        let logo = lib.import_brand_logo_from_workspace(&ws.id, "a.PNG").unwrap();
+        assert!(logo.contains("brands") && Path::new(&logo).is_file());
+        assert!(lib.import_brand_logo(&ws.id, txt.to_str().unwrap()).is_err());
         lib.remove_workspace(&ws.id).unwrap();
         assert!(lib.workspaces().unwrap().is_empty());
 

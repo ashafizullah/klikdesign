@@ -164,7 +164,7 @@ async function run(name: string, a: ToolArgs): Promise<unknown> {
       return { ok: true, design_id: useDesign.getState().design.id, size: `${width}x${height}` };
     }
     case "get_design_guide":
-      return designGuide();
+      return await designGuide();
     case "get_design":
       return describe();
     case "place_image":

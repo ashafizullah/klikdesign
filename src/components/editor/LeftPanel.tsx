@@ -1,5 +1,5 @@
-// Asset sidebar: templates, text presets, shapes and uploaded images.
-import { Image as ImageIcon, LayoutTemplate, Shapes, Type, Upload } from "lucide-react";
+// Asset sidebar: templates, text presets, shapes, uploaded images and the brand kit.
+import { Image as ImageIcon, LayoutTemplate, Palette, Shapes, Type, Upload } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import type { El } from "../../types/design";
@@ -11,17 +11,19 @@ import { ensureFont } from "../../lib/fonts";
 import { ipc } from "../../lib/ipc";
 import { loadImage, loadWorkspaceImage } from "../../lib/images";
 import { IMAGE_EXTS, importImages, mediaChanged, placeImage, useMedia } from "../../lib/media";
-import { workspaceName } from "../../lib/workspace";
+import { linkedWorkspace, workspaceName } from "../../lib/workspace";
+import { BrandKitEditor } from "./BrandKit";
 import { polygonPoints } from "../../lib/geometry";
 import { useT } from "../../i18n";
 import { Button } from "../ui";
 import { DesignPreview } from "./DesignPreview";
 
-const TABS: { id: LeftTab; icon: typeof Type; label: "left.templates" | "left.text" | "left.shapes" | "left.uploads" }[] = [
+const TABS: { id: LeftTab; icon: typeof Type; label: "left.templates" | "left.text" | "left.shapes" | "left.uploads" | "left.brand" }[] = [
   { id: "templates", icon: LayoutTemplate, label: "left.templates" },
   { id: "text", icon: Type, label: "left.text" },
   { id: "shapes", icon: Shapes, label: "left.shapes" },
   { id: "uploads", icon: Upload, label: "left.uploads" },
+  { id: "brand", icon: Palette, label: "left.brand" },
 ];
 
 function addRaw(raw: Record<string, unknown>) {
@@ -55,6 +57,7 @@ export function LeftPanel() {
         {tab === "text" && <TextTab />}
         {tab === "shapes" && <ShapesTab />}
         {tab === "uploads" && <Uploads />}
+        {tab === "brand" && <BrandTab />}
       </div>
     </aside>
   );
@@ -100,6 +103,19 @@ function ThumbEl({ e }: { e: El }) {
   if (e.shape === "line") return <line transform={tf} x1={0} y1={e.h / 2} x2={e.w} y2={e.h / 2} stroke={e.stroke} strokeWidth={e.strokeWidth} />;
   if (e.shape === "rect") return <rect transform={tf} width={e.w} height={e.h} rx={e.cornerRadius} fill={fill} opacity={e.opacity} />;
   return <polygon transform={tf} points={polygonPoints(e.shape, e.w, e.h).join(" ")} fill={fill} opacity={e.opacity} />;
+}
+
+function BrandTab() {
+  const t = useT();
+  const wsId = useDesign((s) => s.design.workspaceId);
+  const ws = linkedWorkspace(wsId);
+  if (!ws) return <p className="text-[11px] leading-relaxed text-muted">{t("brand.noWorkspace")}</p>;
+  return (
+    <div>
+      <div className="label">{t("brand.title", { name: ws.name })}</div>
+      <BrandKitEditor workspaceId={ws.id} apply />
+    </div>
+  );
 }
 
 function TextTab() {

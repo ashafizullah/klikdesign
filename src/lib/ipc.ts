@@ -83,6 +83,10 @@ export const ipc = {
   workspaceAdd: (path: string, name?: string) => invoke<Workspace>("workspace_add", { path, name }),
   workspaceRename: (id: string, name: string) => invoke<void>("workspace_rename", { id, name }),
   workspaceRemove: (id: string) => invoke<void>("workspace_remove", { id }),
+  brandGet: (workspaceId: string) => invoke<string | null>("brand_get", { workspaceId }),
+  brandSet: (workspaceId: string, json: string) => invoke<void>("brand_set", { workspaceId, json }),
+  /** Copies a logo into the brand kit: a picked file (`path`) or one inside the project folder (`rel`). */
+  brandLogoImport: (workspaceId: string, from: { path: string } | { rel: string }) => invoke<string>("brand_logo_import", { workspaceId, ...from }),
   wsOverview: (workspaceId: string) => invoke<string>("ws_overview", { workspaceId }),
   wsListFiles: (workspaceId: string, dir: string, depth?: number) => invoke<string[]>("ws_list_files", { workspaceId, dir, depth }),
   wsReadFile: (workspaceId: string, path: string) => invoke<string>("ws_read_file", { workspaceId, path }),
