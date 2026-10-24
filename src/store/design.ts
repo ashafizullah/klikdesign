@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { temporal } from "zundo";
-import type { Design, El, NewEl } from "../types/design";
+import type { Design, El, NewEl, Page } from "../types/design";
 import { normalizeElement, normalizeFill } from "../types/design";
 import { newId } from "../lib/ids";
+import * as pages from "../lib/pages";
 
 export function emptyDesign(over: Partial<Design> = {}): Design {
   return { version: 1, id: newId("dsn"), name: "Untitled design", width: 1080, height: 1350, background: "#ffffff", elements: [], ...over };
@@ -11,18 +12,29 @@ export function emptyDesign(over: Partial<Design> = {}): Design {
 /** Fills fields added after a design file was written and drops broken elements. */
 export function normalizeDesign(raw: Partial<Design>): Design {
   const base = emptyDesign();
-  const elements = (Array.isArray(raw.elements) ? raw.elements : [])
-    .map((e) => normalizeElement(e as unknown as Record<string, unknown>, typeof e?.id === "string" ? e.id : newId("el")))
-    .filter((e): e is El => !!e);
-  return {
+  const normEls = (list: unknown) =>
+    (Array.isArray(list) ? (list as El[]) : [])
+      .map((e) => normalizeElement(e as unknown as Record<string, unknown>, typeof e?.id === "string" ? e.id : newId("el")))
+      .filter((e): e is El => !!e);
+  const pages: Page[] = (Array.isArray(raw.pages) ? raw.pages : []).map((p) => ({
+    id: typeof p?.id === "string" ? p.id : newId("pg"),
+    background: normalizeFill(p?.background, "#ffffff"),
+    elements: normEls(p?.elements),
+  }));
+  const d: Design = {
     ...base,
     ...raw,
     version: 1,
     width: Math.max(16, Math.round(raw.width ?? base.width)),
     height: Math.max(16, Math.round(raw.height ?? base.height)),
     background: normalizeFill(raw.background, "#ffffff"),
-    elements,
+    elements: normEls(raw.elements),
+    pageId: typeof raw.pageId === "string" ? raw.pageId : newId("pg"),
+    page: Math.min(Math.max(0, Math.round(Number(raw.page) || 0)), pages.length),
   };
+  if (pages.length) d.pages = pages;
+  else delete d.pages;
+  return d;
 }
 
 export type Reorder = "front" | "back" | "forward" | "backward";
@@ -62,6 +74,12 @@ interface DesignState {
   remove(ids: string[]): void;
   duplicate(ids: string[]): string[];
   reorder(ids: string[], to: Reorder): void;
+
+  /** Page actions (carousel); each clears the selection. */
+  openPage(i: number): void;
+  addPage(copy?: boolean): void;
+  removePage(i: number): void;
+  movePage(from: number, to: number): void;
 }
 
 /** Mutating helper: zustand state stays immutable via structuredClone. */
@@ -112,6 +130,11 @@ export const useDesign = create<DesignState>()(
       },
 
       reorder: (ids, to) => get().update((d) => void (d.elements = reorder(d.elements, ids, to))),
+
+      openPage: (i) => set((s) => ((s.design.page ?? 0) === i ? s : { design: pages.goToPage(s.design, i), dirty: true, selected: [] })),
+      addPage: (copy) => set((s) => ({ design: pages.addPage(s.design, copy), dirty: true, selected: [] })),
+      removePage: (i) => set((s) => ({ design: pages.removePage(s.design, i), dirty: true, selected: [] })),
+      movePage: (from, to) => set((s) => ({ design: pages.movePage(s.design, from, to), dirty: true })),
     }),
     {
       limit: 150,

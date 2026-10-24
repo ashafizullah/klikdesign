@@ -11,11 +11,18 @@ function isBackdrop(e: El, d: Design): boolean {
   return e.type !== "text" && e.w >= d.width * 0.9 && e.h >= d.height * 0.9;
 }
 
+/** Every page of the design fitted to `width`×`height`. */
 export function resizeLayout(d: Design, width: number, height: number): Design {
+  const next: Design = { ...d, width: Math.round(width), height: Math.round(height), elements: fitElements(d, d.elements, width, height) };
+  if (d.pages) next.pages = d.pages.map((p) => ({ ...p, elements: fitElements(d, p.elements, width, height) }));
+  return next;
+}
+
+function fitElements(d: Design, list: El[], width: number, height: number): El[] {
   const sx = width / d.width;
   const sy = height / d.height;
   const s = Math.min(sx, sy);
-  const elements = d.elements.map((e): El => {
+  return list.map((e): El => {
     if (isBackdrop(e, d)) {
       if (e.type === "image") {
         // Keep the photo's aspect: cover the new page and center it.
@@ -45,5 +52,4 @@ export function resizeLayout(d: Design, width: number, height: number): Design {
     const cornerRadius = e.cornerRadius ? { cornerRadius: round(e.cornerRadius * s) } : {};
     return { ...e, ...common, ...stroke, ...cornerRadius };
   });
-  return { ...d, width: Math.round(width), height: Math.round(height), elements };
 }

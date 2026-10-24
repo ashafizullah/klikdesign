@@ -71,6 +71,18 @@ export type ElType = El["type"];
 /** An element before it gets an id. */
 export type NewEl = El extends infer T ? (T extends El ? Omit<T, "id"> : never) : never;
 
+/** One page of a multi-page design (carousel). */
+export interface Page {
+  id: string;
+  background: Fill;
+  elements: El[];
+}
+
+/**
+ * The open page's content is `background` and `elements`, so everything that
+ * edits a page works on it directly; the other pages wait in `pages`, in order
+ * without the open one, which sits at index `page` (see lib/pages).
+ */
 export interface Design {
   version: 1;
   id: string;
@@ -81,6 +93,12 @@ export interface Design {
   elements: El[];
   /** Linked project folder the AI researches (brand, copy, logo). */
   workspaceId?: string | null;
+  /** Id of the open page. */
+  pageId?: string;
+  /** Index of the open page among all pages (0 when there is one). */
+  page?: number;
+  /** The other pages, in order; absent for a single page. */
+  pages?: Page[];
 }
 
 export interface SizePreset {

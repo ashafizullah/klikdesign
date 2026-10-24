@@ -8,6 +8,7 @@ import type { Message, ToolDef } from "./ipc";
 import { FONTS, ensureFonts, fontInfo, loadSystemFonts, nearestWeight, useFonts } from "./fonts";
 import { mediaChanged } from "./media";
 import { resizeLayout } from "./resize";
+import { pageCount } from "./pages";
 import { useUi } from "../store/ui";
 import { brandOf, isEmptyBrand, loadBrand, normalizeBrand, updateBrand } from "../store/brand";
 import { renderPage, textLines } from "./stage";
@@ -44,6 +45,7 @@ Element types:
 - shape: shape (rect|ellipse|triangle|star|line), fill, stroke, strokeWidth, cornerRadius (rect only). A line is drawn horizontally through the middle of its box using stroke/strokeWidth.
 - image: pictures. You cannot generate images, but you may move, resize, layer or round them (cornerRadius)${project ? ", and place images from the project folder with place_project_image" : ""}.
 Any element also takes opacity (0–1), name, and shadow {color, blur, offsetX, offsetY}.
+A design can have several pages (a carousel or slide set); the tools act on the open page (get_design says which). For a carousel, finish page 1, then add_page for each next slide (copy_current: true to keep the layout and change the copy), keeping one visual system across slides.
 A fill is a CSS color ("#0f172a", "rgba(0,0,0,0.5)") or a linear gradient {"kind":"linear","angle":deg,"colors":["#…","#…"]} (0° = left→right, 90° = top→bottom).
 
 Available fonts (use these):
@@ -138,6 +140,13 @@ export function tools(vision: boolean, project: boolean): ToolDef[] {
   list.push(
     { name: "rename_design", description: "Renames the open design (its title in the library).", parameters: obj({ name: str }, ["name"]) },
     {
+      name: "add_page",
+      description: "Adds a page after the open one and opens it (carousel slides). copy_current copies the open page to edit; otherwise it is blank with the same background.",
+      parameters: obj({ copy_current: { type: "boolean" } }),
+    },
+    { name: "go_to_page", description: "Opens page n (1-based); the other tools then act on it.", parameters: obj({ page: num }, ["page"]) },
+    { name: "remove_page", description: "Deletes page n (1-based). The last remaining page cannot be deleted.", parameters: obj({ page: num }, ["page"]) },
+    {
       name: "resize_design",
       description: "Changes the page size and fits the layout to it: backgrounds stretch, other elements scale proportionally and keep their relative place. Then re-lay out for the new format with update_elements (get_design first). Give a size preset or width and height.",
       parameters: obj({
@@ -201,6 +210,7 @@ export function describe(): unknown {
   const lines = textLines();
   return {
     name: design.name,
+    page: `${(design.page ?? 0) + 1} of ${pageCount(design)}`,
     width: design.width,
     height: design.height,
     background: design.background,
@@ -251,10 +261,25 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
   switch (name) {
     case "get_design":
       return describe();
+    case "add_page":
+      store.addPage(a.copy_current === true);
+      await settle(useDesign.getState().design.elements);
+      return describe();
+    case "go_to_page":
+    case "remove_page": {
+      const total = pageCount(store.design);
+      const n = Math.round(Number(a.page));
+      if (!(n >= 1 && n <= total)) throw new Error(`page must be between 1 and ${total}`);
+      if (name === "go_to_page") store.openPage(n - 1);
+      else if (total < 2) throw new Error("the last page cannot be deleted");
+      else store.removePage(n - 1);
+      await settle(useDesign.getState().design.elements);
+      return describe();
+    }
     case "resize_design": {
       const { width, height } = resizeTarget(a);
       const next = resizeLayout(store.design, width, height);
-      store.update((d) => Object.assign(d, { width: next.width, height: next.height, elements: next.elements }));
+      store.update((d) => Object.assign(d, { width: next.width, height: next.height, elements: next.elements, pages: next.pages }));
       useUi.getState().setZoom(null);
       await settle(next.elements);
       return describe();

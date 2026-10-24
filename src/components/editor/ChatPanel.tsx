@@ -13,6 +13,9 @@ import { Markdown } from "../ui/Markdown";
 const TOOL_LABELS: Record<string, Key> = {
   get_design: "tool.get_design",
   rename_design: "tool.rename_design",
+  add_page: "tool.add_page",
+  go_to_page: "tool.go_to_page",
+  remove_page: "tool.remove_page",
   update_brand_kit: "tool.update_brand_kit",
   place_brand_logo: "tool.place_brand_logo",
   resize_design: "tool.resize_design",
