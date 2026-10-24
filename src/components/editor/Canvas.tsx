@@ -283,7 +283,7 @@ export function Canvas() {
   }, [editingId, editing]);
 
   return (
-    <div ref={wrap} className="checker-soft relative min-w-0 flex-1 overflow-hidden" style={{ cursor: spaceDown ? "grab" : undefined }}>
+    <div ref={wrap} className="checker-soft grain-free min-w-0 flex-1 overflow-hidden" style={{ cursor: spaceDown ? "grab" : undefined }}>
       {size.w > 0 && (
         <Stage
           ref={stageRef}
@@ -314,8 +314,8 @@ export function Canvas() {
               rotateEnabled={!anyLocked}
               anchorSize={9}
               anchorCornerRadius={5}
-              anchorStroke="#7c5cff"
-              borderStroke="#7c5cff"
+              anchorStroke="#d9603b"
+              borderStroke="#d9603b"
               borderStrokeWidth={1.5}
               padding={2}
               ignoreStroke
@@ -328,7 +328,7 @@ export function Canvas() {
                 <Line key={i} points={[0, origin.y + g.pos * zoom, size.w, origin.y + g.pos * zoom]} stroke="#ff3d9a" strokeWidth={1} dash={[4, 4]} listening={false} />
               ),
             )}
-            {marquee && <Rect x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="rgba(124,92,255,0.12)" stroke="#7c5cff" strokeWidth={1} listening={false} />}
+            {marquee && <Rect x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="rgba(217,96,59,0.12)" stroke="#d9603b" strokeWidth={1} listening={false} />}
           </Layer>
         </Stage>
       )}
@@ -392,7 +392,7 @@ function TextEditor({ el, origin, zoom }: { el: TextEl; origin: { x: number; y: 
         textTransform: el.uppercase ? "uppercase" : undefined,
         color,
         caretColor: color,
-        outline: "1.5px solid #7c5cff",
+        outline: "1.5px solid #d9603b",
       }}
     />
   );

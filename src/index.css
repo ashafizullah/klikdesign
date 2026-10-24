@@ -1,16 +1,44 @@
 @import "tailwindcss";
 
+/* Darkroom: warm charcoal surfaces, cream type, tungsten amber, safelight red. */
 @theme {
-  --color-bg: #0f1012;
-  --color-panel: #17181b;
-  --color-panel-2: #1e2024;
-  --color-line: #2a2d32;
-  --color-muted: #8a8f98;
-  --color-text: #e8eaed;
-  --color-accent: #22d3c5;
-  --color-accent-2: #7c5cff;
-  --color-danger: #ff5a6a;
-  --font-sans: Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --color-bg: #15130f;
+  --color-panel: #1d1a15;
+  --color-panel-2: #25211b;
+  --color-line: #2e2a22;
+  --color-muted: #9a917f;
+  --color-text: #ede6d8;
+  --color-accent: #f0a83a;
+  --color-accent-2: #d9603b;
+  --color-danger: #e5484d;
+  --color-ok: #9bb067;
+  --color-tip: #2c2720;
+  --color-ink: #1a1208;
+  --color-track-video: #1a1712;
+  --color-track-audio: #17150f;
+  --color-clip-scene: #6b4119;
+  --color-clip-scene-edge: #f0a83a;
+  --color-clip-text: #5e2a1f;
+  --color-clip-text-edge: #d9603b;
+  --color-clip-audio: #343c1e;
+  --color-clip-audio-edge: #9bb067;
+  --color-clip-media: #252e35;
+  --color-clip-media-edge: #7c94a6;
+  --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-serif: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --animate-rise: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 :root {
@@ -31,6 +59,26 @@ body,
   user-select: none;
 }
 
+/* Faint film grain over the chrome. The preview stacks above it (see .grain-free). */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.grain-free {
+  position: relative;
+  z-index: 41;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
 input,
 textarea,
 select {
@@ -42,35 +90,46 @@ select {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #33363c;
+  background: #3a342a;
   border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4236;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .field {
-  @apply w-full rounded-md border border-line bg-bg px-2 py-1.5 text-[12px] text-text outline-none focus:border-accent;
+  @apply w-full rounded-md border border-line bg-bg px-2 py-1.5 text-[12px] text-text outline-none transition-[border-color,box-shadow] placeholder:text-muted/60 focus:border-accent/70 focus:ring-2 focus:ring-accent/15;
 }
 
 .label {
-  @apply mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted;
+  @apply mb-1 block font-mono text-[10px] font-medium tracking-[0.12em] text-muted uppercase;
+}
+
+/* Sprocket holes along the top edge of a film frame. */
+.sprockets {
+  background-image: repeating-linear-gradient(90deg, transparent 0 7px, rgba(237, 230, 216, 0.16) 7px 15px, transparent 15px 22px);
+  background-size: 22px 4px;
+  background-repeat: repeat-x;
+  background-position: 0 50%;
 }
 
 .checker {
-  background-color: #111;
+  background-color: #14110d;
   background-image:
-    linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
-    linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
-    linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+    linear-gradient(45deg, #1d1914 25%, transparent 25%),
+    linear-gradient(-45deg, #1d1914 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1d1914 75%),
+    linear-gradient(-45deg, transparent 75%, #1d1914 75%);
   background-size: 20px 20px;
   background-position: 0 0, 0 10px, 10px -10px, -10px 0;
 }
 
 .checker-soft {
-  background-color: #141518;
-  background-image: radial-gradient(#23252a 1px, transparent 1px);
+  background-color: #13110d;
+  background-image: radial-gradient(#2a251d 1px, transparent 1px);
   background-size: 18px 18px;
 }
 

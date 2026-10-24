@@ -74,7 +74,7 @@ export function Layers() {
             onPointerMove={onMove}
             onPointerUp={(ev) => onUp(ev, e, sel)}
             onPointerCancel={() => ((drag.current = null), setTarget(null))}
-            className={`group flex cursor-default touch-none items-center gap-2 rounded-md px-2 py-1 text-[12px] select-none ${sel ? "bg-accent-2/20" : "hover:bg-panel-2"} ${
+            className={`group flex cursor-default touch-none items-center gap-2 rounded-md px-2 py-1 text-[12px] select-none ${sel ? "bg-accent/15 text-text" : "hover:bg-panel-2"} ${
               line && target.to === i ? "border-t-2 border-accent" : line && target.to === top.length && i === top.length - 1 ? "border-b-2 border-accent" : "border-y-2 border-transparent"
             } ${e.hidden ? "opacity-50" : ""} ${target?.from === i ? "opacity-60" : ""}`}
           >

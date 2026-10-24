@@ -27,7 +27,7 @@ export function RightPanel() {
             onClick={() => setTab(id)}
             className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 py-2.5 text-[12px] ${tab === id ? "border-accent text-text" : "border-transparent text-muted hover:text-text"}`}
           >
-            <Icon size={13} className={id === "ai" && busy ? "animate-pulse text-accent-2" : ""} /> {t(label)}
+            <Icon size={13} className={id === "ai" && busy ? "animate-pulse text-accent" : ""} /> {t(label)}
           </button>
         ))}
       </div>

@@ -14,10 +14,10 @@ export function McpBadge() {
       aria-label={title}
       onClick={() => !useUi.getState().terminal && useUi.getState().toggleTerminal()}
       className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] transition ${
-        link.connected ? "border-green-500/50 bg-green-500/15 text-green-400" : "border-green-500/30 text-green-400/80 hover:text-green-400"
+        link.connected ? "border-ok/50 bg-ok/15 text-ok" : "border-ok/30 text-ok/80 hover:text-ok"
       }`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full bg-green-500 ${link.connected ? "shadow-[0_0_6px] shadow-green-500" : ""}`} />
+      <span className={`h-1.5 w-1.5 rounded-full bg-ok ${link.connected ? "shadow-[0_0_6px] shadow-ok/70" : ""}`} />
       {link.connected ? t("mcp.connected") : t("mcp.waiting")}
     </button>
   );

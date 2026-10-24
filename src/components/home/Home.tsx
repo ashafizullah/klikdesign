@@ -123,11 +123,11 @@ export function Home() {
       <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-panel">
         <div className="flex h-14 items-center gap-2 border-b border-line px-4" data-tauri-drag-region>
           <img src={logo} alt="" className="h-8 w-8" draggable={false} />
-          <span className="text-[13px] font-semibold">KlikDesign</span>
+          <span className="font-serif text-[18px] font-medium tracking-[-0.02em]">Klik<span className="text-accent italic">Design</span></span>
         </div>
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <span className="label mb-0">{t("home.workspaces")}</span>
-          <button className="text-muted hover:text-accent" title={t("ws.add")} onClick={() => addWorkspace().catch(notifyError)}>
+          <button className="text-muted transition hover:text-accent" title={t("ws.add")} onClick={() => addWorkspace().catch(notifyError)}>
             <FolderPlus size={15} />
           </button>
         </div>
@@ -137,7 +137,7 @@ export function Home() {
               key={w.id}
               onClick={() => selectWorkspace(w.id)}
               onContextMenu={(e) => workspaceMenu(e, w)}
-              className={`flex w-full items-start gap-2 rounded-md px-2 py-2 text-left ${w.id === workspaceId ? "bg-panel-2" : "hover:bg-panel-2/60"}`}
+              className={`relative flex w-full items-start gap-2 rounded-md px-2 py-2 text-left transition ${w.id === workspaceId ? "bg-panel-2 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-accent" : "hover:bg-panel-2/60"}`}
             >
               <Folder size={14} className={`mt-0.5 shrink-0 ${w.id === workspaceId ? "text-accent" : "text-muted"}`} />
               <span className="min-w-0">
@@ -150,7 +150,7 @@ export function Home() {
           {unlinked.length > 0 && (
             <button
               onClick={() => selectWorkspace(NO_WORKSPACE)}
-              className={`flex w-full items-start gap-2 rounded-md px-2 py-2 text-left ${none ? "bg-panel-2" : "hover:bg-panel-2/60"}`}
+              className={`relative flex w-full items-start gap-2 rounded-md px-2 py-2 text-left transition ${none ? "bg-panel-2 before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-accent" : "hover:bg-panel-2/60"}`}
             >
               <Inbox size={14} className={`mt-0.5 shrink-0 ${none ? "text-accent" : "text-muted"}`} />
               <span className="min-w-0">
@@ -188,20 +188,20 @@ export function Home() {
       <main className="flex min-w-0 flex-1 flex-col">
         {!ws && !(none && unlinked.length) ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center" data-tauri-drag-region>
-            <FolderPlus size={40} className="text-accent" />
+            <FolderPlus size={40} strokeWidth={1.5} className="text-accent" />
             <div>
-              <h1 className="text-[18px] font-semibold">{t("home.emptyTitle")}</h1>
+              <h1 className="font-serif text-[26px] font-medium tracking-[-0.02em]">{t("home.emptyTitle")}</h1>
               <p className="mt-1 max-w-md text-[12px] leading-relaxed text-muted">{t("home.emptyBody")}</p>
             </div>
             <Button variant="primary" onClick={() => addWorkspace().catch(notifyError)}><FolderPlus size={14} /> {t("ws.add")}</Button>
           </div>
         ) : (
         <>
-        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-6" data-tauri-drag-region>
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-line px-6" data-tauri-drag-region>
           <div className="group/title min-w-0">
             <div className="flex items-center gap-1.5">
               <h1
-                className={`truncate text-[15px] font-semibold ${ws ? "cursor-text" : ""}`}
+                className={`truncate font-serif text-[20px] font-medium tracking-[-0.015em] ${ws ? "cursor-text" : ""}`}
                 onDoubleClick={() => ws && setRenaming({ kind: "workspace", id: ws.id, name: ws.name })}
               >
                 {ws?.name ?? t("home.noFolder")}
@@ -212,7 +212,7 @@ export function Home() {
                 </button>
               )}
             </div>
-            <p className="truncate text-[11px] text-muted">{ws ? `${ws.path} · ${usage(ws.id)}` : t("home.noFolderSub")}</p>
+            <p className="truncate font-mono text-[10.5px] text-muted">{ws ? `${ws.path} · ${usage(ws.id)}` : t("home.noFolderSub")}</p>
           </div>
           <div className="flex shrink-0 gap-2">
             {ws && <Button variant="ghost" onClick={() => setBrandFor(ws)}><Palette size={13} /> {t("brand.button")}</Button>}
@@ -223,7 +223,7 @@ export function Home() {
         <div className="flex-1 space-y-8 overflow-y-auto p-6">
           {ws && <AiCard workspace={ws} />}
           <section>
-            <h2 className="mb-3 text-[13px] font-semibold">{t("home.designs")}</h2>
+            <h2 className="label mb-3">{t("home.designs")}</h2>
             {mine.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-12 text-center text-[12px] text-muted">
                 <Palette size={32} />
@@ -232,10 +232,11 @@ export function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
-                {mine.map((d) => (
+                {mine.map((d, i) => (
                   <div
                     key={d.id}
-                    className="group relative cursor-pointer overflow-hidden rounded-xl border border-line bg-panel hover:border-accent"
+                    style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
+                    className="group relative animate-rise cursor-pointer overflow-hidden rounded-lg border border-line bg-panel transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-accent/70 hover:shadow-[0_14px_30px_-12px_rgba(0,0,0,0.8)]"
                     onClick={() => openDesign(d.id)}
                     onContextMenu={(e) => designMenu(e, d)}
                   >
@@ -243,14 +244,14 @@ export function Home() {
                       {d.thumb ? (
                         <img src={d.thumb} alt="" className="max-h-full max-w-full shadow-lg" draggable={false} />
                       ) : (
-                        <div className="bg-white/90 shadow-lg" style={{ aspectRatio: `${d.width}/${d.height}`, height: "80%" }} />
+                        <div className="bg-[#f4efe4] shadow-lg" style={{ aspectRatio: `${d.width}/${d.height}`, height: "80%" }} />
                       )}
                     </div>
                     <div className="p-3">
                       <div className="truncate text-[13px] font-medium" onDoubleClick={(e) => (e.stopPropagation(), setRenaming({ kind: "design", id: d.id, name: d.name }))}>
                         {d.name || t("home.untitled")}
                       </div>
-                      <div className="mt-0.5 text-[11px] text-muted">
+                      <div className="mt-1 font-mono text-[10.5px] text-muted">
                         {d.width}×{d.height} · {formatMB(d.size)} ·{" "}
                         {new Date(d.updatedAt).toLocaleDateString(locale === "id" ? "id-ID" : "en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                       </div>
@@ -320,8 +321,8 @@ function AiCard({ workspace }: { workspace: Workspace }) {
     }
   };
   return (
-    <section className="rounded-2xl border border-line bg-gradient-to-br from-accent-2/25 via-panel to-accent/10 p-5">
-      <h2 className="flex items-center gap-2 text-[17px] font-semibold"><Sparkles size={18} className="text-accent" /> {t("home.aiTitle")}</h2>
+    <section className="rounded-2xl border border-line bg-gradient-to-br from-accent/15 via-panel to-accent-2/10 p-5">
+      <h2 className="flex items-center gap-2 font-serif text-[20px] font-medium tracking-[-0.015em]"><Sparkles size={18} className="text-accent" /> {t("home.aiTitle")}</h2>
       <p className="mt-1 text-[12px] text-muted">{t("home.aiSubWs", { name: workspace.name })}</p>
       <input
         className="field mt-3 text-[13px]"

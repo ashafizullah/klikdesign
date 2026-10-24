@@ -33,18 +33,21 @@ export function TopBar() {
         </>
       )}
       <input
-        className="w-64 rounded-md bg-transparent px-2 py-1 text-[13px] font-medium outline-none hover:bg-panel-2 focus:bg-panel-2"
+        className="w-64 rounded-md bg-transparent px-2 py-1 font-serif text-[15px] font-medium tracking-[-0.01em] outline-none hover:bg-panel-2 focus:bg-panel-2"
         value={name}
         onChange={(e) => useDesign.getState().update((d) => void (d.name = e.target.value))}
       />
-      <span className="text-[11px] text-muted">{dirty ? t("top.saving") : t("top.saved")}</span>
+      <span className="flex items-center gap-1.5 font-mono text-[10.5px] text-muted">
+        <span className={`h-1.5 w-1.5 rounded-full ${dirty ? "animate-pulse bg-accent" : "bg-muted/50"}`} />
+        {dirty ? t("top.saving") : t("top.saved")}
+      </span>
       <div className="mx-2 h-5 w-px bg-line" />
       <IconButton title={t("top.undo")} disabled={!canUndo} onClick={undo}><Undo2 size={15} /></IconButton>
       <IconButton title={t("top.redo")} disabled={!canRedo} onClick={redo}><Redo2 size={15} /></IconButton>
       <div className="flex-1" />
       <div className="flex items-center rounded-md border border-line">
         <IconButton title={t("top.zoomOut")} onClick={() => setZoom(zoom / 1.2)}><Minus size={14} /></IconButton>
-        <button className="w-12 text-center text-[11px] text-muted tabular-nums hover:text-text" title={t("top.zoomFit")} onClick={() => setZoom(null)}>
+        <button className="w-12 text-center font-mono text-[11px] text-muted tabular-nums hover:text-text" title={t("top.zoomFit")} onClick={() => setZoom(null)}>
           {Math.round(zoom * 100)}%
         </button>
         <IconButton title={t("top.zoomIn")} onClick={() => setZoom(zoom * 1.2)}><Plus size={14} /></IconButton>

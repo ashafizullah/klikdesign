@@ -77,7 +77,7 @@ export function ChatPanel() {
       <div ref={list} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {items.length === 0 && (
           <div className="space-y-3 py-4 text-center">
-            <Sparkles className="mx-auto text-accent-2" size={22} />
+            <Sparkles className="mx-auto text-accent" size={22} />
             <p className="text-[12px] leading-relaxed text-muted">{t(empty ? "chat.introEmpty" : "chat.intro")}</p>
             {ws && <p className="text-[11px] leading-relaxed text-accent">{t("chat.introProject")}</p>}
             <div className="space-y-1.5">
@@ -90,7 +90,7 @@ export function ChatPanel() {
           </div>
         )}
         {items.map((it, i) => {
-          if (it.kind === "user") return <div key={i} className="ml-6 rounded-lg bg-accent-2/20 px-3 py-2 text-[12px] whitespace-pre-wrap select-text">{it.text}</div>;
+          if (it.kind === "user") return <div key={i} className="ml-6 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2 text-[12px] whitespace-pre-wrap select-text">{it.text}</div>;
           if (it.kind === "assistant") return <Markdown key={i} text={it.text} className="mr-4 text-[12px] leading-relaxed select-text" />;
           if (it.kind === "error")
             return (

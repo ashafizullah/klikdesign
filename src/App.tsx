@@ -69,7 +69,7 @@ export default function App() {
       {toast && (
         <div
           className={`fixed bottom-6 left-1/2 z-[60] max-w-xl -translate-x-1/2 rounded-lg border px-4 py-2 text-[12px] whitespace-pre-wrap shadow-xl ${
-            toast.kind === "error" ? "border-danger/50 bg-[#2a1216] text-danger" : "border-line bg-panel-2 text-text"
+            toast.kind === "error" ? "border-danger/50 bg-[#2a1512] text-danger" : "border-line bg-panel-2 text-text"
           }`}
         >
           {toast.text}

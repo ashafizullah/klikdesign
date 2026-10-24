@@ -36,11 +36,11 @@ export default function TerminalPanel() {
     const el = host.current;
     if (!el) return;
     const xterm = new Terminal({
-      fontFamily: '"SF Mono", Menlo, Consolas, monospace',
+      fontFamily: '"IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace',
       fontSize: 12,
       cursorBlink: true,
       allowProposedApi: true,
-      theme: { background: "#0f1012", foreground: "#e8eaed", cursor: "#22d3c5", selectionBackground: "#22d3c544" },
+      theme: { background: "#15130f", foreground: "#ede6d8", cursor: "#f0a83a", cursorAccent: "#15130f", selectionBackground: "#f0a83a44" },
     });
     const fitAddon = new FitAddon();
     xterm.loadAddon(fitAddon);

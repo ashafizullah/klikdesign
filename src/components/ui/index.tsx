@@ -11,9 +11,9 @@ export function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
   const styles: Record<Variant, string> = {
-    primary: "bg-accent text-black hover:brightness-110 font-semibold",
-    ghost: "text-text hover:bg-panel-2",
-    subtle: "bg-panel-2 text-text hover:bg-line border border-line",
+    primary: "bg-accent text-ink font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_1px_2px_rgba(0,0,0,0.4)] hover:brightness-110 active:brightness-95",
+    ghost: "text-text hover:bg-panel-2 hover:text-text",
+    subtle: "bg-panel-2 text-text hover:bg-line hover:border-muted/40 border border-line",
     danger: "bg-danger/15 text-danger hover:bg-danger/25 border border-danger/30",
   };
   return (
@@ -29,7 +29,7 @@ export function IconButton({ title, active, className = "", ...rest }: ButtonHTM
     <button
       title={title}
       aria-label={title}
-      className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-panel-2 disabled:opacity-30 ${active ? "text-accent" : "text-text"} ${className}`}
+      className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-panel-2 disabled:opacity-30 ${active ? "bg-accent/10 text-accent" : "text-text"} ${className}`}
       {...rest}
     />
   );
@@ -127,14 +127,14 @@ export function Modal({ title, onClose, children, width = 560 }: { title: string
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0806]/70 backdrop-blur-sm" onMouseDown={onClose}>
       <div
-        className="flex max-h-[90vh] flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl"
+        className="flex max-h-[90vh] flex-col overflow-hidden animate-rise rounded-xl border border-line bg-panel shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
         style={{ width }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="text-[14px] font-semibold">{title}</h2>
+          <h2 className="font-serif text-[17px] font-medium tracking-[-0.01em]">{title}</h2>
           <IconButton title={t("common.close")} onClick={onClose}>
             <X size={16} />
           </IconButton>
@@ -149,7 +149,7 @@ export function Section({ title, children, right }: { title: string; children: R
   return (
     <section className="border-b border-line px-3 py-3">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-[12px] font-semibold text-text">{title}</h3>
+        <h3 className="font-mono text-[10px] font-medium tracking-[0.12em] text-muted uppercase">{title}</h3>
         {right}
       </div>
       <div className="space-y-2.5">{children}</div>
