@@ -191,7 +191,9 @@ export function Canvas() {
         const w = (text?.width() ?? el.w) * sx;
         Object.assign(patch, { w: Math.max(20, w), fontSize: Math.max(4, Math.round(el.fontSize * sy * 10) / 10) } satisfies Partial<TextEl>);
       } else {
-        Object.assign(patch, { w: Math.max(1, el.w * sx), h: Math.max(1, el.h * sy) });
+        const w = Math.max(1, el.w * sx);
+        // A QR code stays square.
+        Object.assign(patch, { w, h: el.type === "qr" ? w : Math.max(1, el.h * sy) });
       }
       useDesign.getState().patch(el.id, patch);
     },
@@ -348,7 +350,7 @@ export function Canvas() {
               ref={trRef}
               rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
               rotationSnapTolerance={4}
-              keepRatio={onlyText}
+              keepRatio={onlyText || (sel.length === 1 && (sel[0].type === "qr" || sel[0].type === "icon"))}
               enabledAnchors={anyLocked ? [] : onlyText ? TEXT_ANCHORS : undefined}
               resizeEnabled={!anyLocked}
               rotateEnabled={!anyLocked}

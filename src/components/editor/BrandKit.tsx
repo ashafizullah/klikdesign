@@ -24,7 +24,7 @@ function applyColor(c: string) {
   const { design, selected, patchMany, update } = useDesign.getState();
   const sel = design.elements.filter((e) => selected.includes(e.id) && e.type !== "image");
   if (!sel.length) return update((d) => void (d.background = c));
-  patchMany(sel.map((e) => ({ id: e.id, patch: e.type === "shape" && e.shape === "line" ? { stroke: c } : { fill: c } })));
+  patchMany(sel.map((e) => ({ id: e.id, patch: e.type === "icon" || e.type === "qr" ? { color: c } : e.type === "shape" && e.shape === "line" ? { stroke: c } : { fill: c } })));
 }
 
 /** Applies a brand font to the selected text, or adds a heading in it. */

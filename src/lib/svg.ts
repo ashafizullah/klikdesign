@@ -3,15 +3,18 @@
 import type { Design, El, Fill, Shadow } from "../types/design";
 import { isGradient } from "../types/design";
 import { cssUrl, googleFont } from "./fonts";
-import { gradientPoints, imageCrop, polygonPoints, textHeight } from "./geometry";
+import { gradientPoints, imageCrop, maskPath, polygonPoints, textHeight } from "./geometry";
+import { qrPath } from "./qr";
 
 export interface SvgInputs {
   /** Wrapped lines per text element id. */
   lines: Record<string, string[]>;
-  /** Data URI per image `src`. */
+  /** Data URI per image `src`, or per element id for an adjusted photo. */
   images: Record<string, string>;
-  /** Natural size per image `src`, needed to export a crop. */
+  /** Natural size per image `src` (or element id, for adjusted photos), needed to export a crop. */
   sizes?: Record<string, { w: number; h: number }>;
+  /** Path data per icon name (the icon library loads on demand). */
+  icons?: Record<string, string[]>;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -55,22 +58,37 @@ export function designToSvg(d: Design, inputs: SvgInputs): string {
         return `<polygon points="${pairs.join(" ")}" fill="${fill}"${st} stroke-linejoin="round"/>`;
       }
       case "image": {
-        const href = inputs.images[e.src];
+        // An adjusted photo is passed by element id, already processed.
+        const href = inputs.images[e.id] ?? inputs.images[e.src];
         if (!href) return "";
         let clip = "";
-        if (e.cornerRadius) {
+        if (e.mask || e.cornerRadius) {
           const id = uid("c");
-          defs.push(`<clipPath id="${id}"><rect width="${n(e.w)}" height="${n(e.h)}" rx="${n(e.cornerRadius)}"/></clipPath>`);
+          const shape = e.mask ? `<path d="${maskPath(e.mask, e.w, e.h)}"/>` : `<rect width="${n(e.w)}" height="${n(e.h)}" rx="${n(e.cornerRadius!)}"/>`;
+          defs.push(`<clipPath id="${id}">${shape}</clipPath>`);
           clip = ` clip-path="url(#${id})"`;
         }
-        const size = inputs.sizes?.[e.src];
+        const size = inputs.sizes?.[e.id] ?? inputs.sizes?.[e.src];
+        const overlay = e.overlay ? `<rect width="${n(e.w)}" height="${n(e.h)}" fill="${esc(e.overlay.color)}" opacity="${n(e.overlay.opacity)}"/>` : "";
+        let photo: string;
         if (e.crop && size) {
           // The crop as a viewBox onto the whole image, which the nested svg clips to the box.
           const c = imageCrop(size.w, size.h, e.w, e.h, e.crop);
-          const view = `<svg width="${n(e.w)}" height="${n(e.h)}" viewBox="${n(c.x)} ${n(c.y)} ${n(c.width)} ${n(c.height)}" preserveAspectRatio="none"><image href="${href}" width="${size.w}" height="${size.h}"/></svg>`;
-          return clip ? `<g${clip}>${view}</g>` : view;
-        }
-        return `<image href="${href}" width="${n(e.w)}" height="${n(e.h)}" preserveAspectRatio="xMidYMid slice"${clip}/>`;
+          photo = `<svg width="${n(e.w)}" height="${n(e.h)}" viewBox="${n(c.x)} ${n(c.y)} ${n(c.width)} ${n(c.height)}" preserveAspectRatio="none"><image href="${href}" width="${size.w}" height="${size.h}"/></svg>`;
+        } else photo = `<image href="${href}" width="${n(e.w)}" height="${n(e.h)}" preserveAspectRatio="xMidYMid slice"/>`;
+        return clip || overlay ? `<g${clip}>${photo}${overlay}</g>` : photo;
+      }
+      case "icon": {
+        const paths = inputs.icons?.[e.icon];
+        if (!paths) return "";
+        const body = paths.map((d) => `<path d="${esc(d)}"/>`).join("");
+        return `<g transform="scale(${n(e.w / 24)} ${n(e.h / 24)})" fill="none" stroke="${esc(e.color)}" stroke-width="${n(e.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round">${body}</g>`;
+      }
+      case "qr": {
+        const qr = qrPath(e.data);
+        if (!qr) return "";
+        const bg = e.background === "transparent" ? "" : `<rect width="${n(e.w)}" height="${n(e.h)}" fill="${esc(e.background)}"/>`;
+        return `${bg}<path transform="scale(${n(e.w / qr.size)})" d="${qr.path}" fill="${esc(e.color)}"/>`;
       }
       case "text": {
         const lines = inputs.lines[e.id] ?? e.text.split("\n");

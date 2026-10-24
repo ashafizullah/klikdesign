@@ -30,6 +30,7 @@ const TOOL_LABELS: Record<string, Key> = {
   remove_elements: "tool.remove_elements",
   reorder: "tool.reorder",
   group_elements: "tool.group_elements",
+  search_icons: "tool.search_icons",
   ungroup_elements: "tool.ungroup_elements",
   view_design: "tool.view_design",
   list_files: "tool.list_files",
@@ -143,7 +144,7 @@ export function ChatPanel() {
   );
 }
 
-const READ_ONLY = new Set(["get_design", "view_design", "list_files", "read_file", "search_code", "list_project_images", "view_project_image", "list_design_images", "view_design_image", "list_installed_fonts"]);
+const READ_ONLY = new Set(["get_design", "view_design", "list_files", "read_file", "search_code", "list_project_images", "view_project_image", "list_design_images", "view_design_image", "list_installed_fonts", "search_icons"]);
 
 function toolCount(input: Record<string, unknown>): number {
   const arr = input.elements ?? input.updates ?? input.ids;

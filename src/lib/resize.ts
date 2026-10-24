@@ -45,11 +45,12 @@ function fitElements(d: Design, list: El[], width: number, height: number): El[]
     }
     const shadow = e.shadow && { ...e.shadow, blur: round(e.shadow.blur * s), offsetX: round(e.shadow.offsetX * s), offsetY: round(e.shadow.offsetY * s) };
     const common = { x: round(x), y: round(y), w: round(w), h: round(h), shadow };
-    const stroke = e.type !== "image" && e.strokeWidth ? { strokeWidth: round(e.strokeWidth * s) } : {};
+    // An icon's stroke is in its own grid and scales with the box already.
+    const stroke = (e.type === "text" || e.type === "shape") && e.strokeWidth ? { strokeWidth: round(e.strokeWidth * s) } : {};
     if (e.type === "text") {
       return { ...e, ...common, ...stroke, fontSize: Math.max(4, round(e.fontSize * s)), letterSpacing: round(e.letterSpacing * s) };
     }
-    const cornerRadius = e.cornerRadius ? { cornerRadius: round(e.cornerRadius * s) } : {};
+    const cornerRadius = (e.type === "shape" || e.type === "image") && e.cornerRadius ? { cornerRadius: round(e.cornerRadius * s) } : {};
     return { ...e, ...common, ...stroke, ...cornerRadius };
   });
 }

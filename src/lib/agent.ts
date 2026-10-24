@@ -15,6 +15,7 @@ import { renderPage, textLines } from "./stage";
 import { ipc } from "./ipc";
 import { linkedWorkspace } from "./workspace";
 import { jpegBase64, loadImage, loadWorkspaceImage } from "./images";
+import { loadIcons, searchIcons } from "./icons";
 import { LOCALES, translate } from "../i18n";
 import { textHeight } from "./geometry";
 import { runToolLoop, WithImage, type ToolArgs } from "./toolLoop";
@@ -43,7 +44,9 @@ The page is ${width}×${height} px. Coordinates are page pixels from the top-lef
 Element types:
 - text: text, fontFamily, fontSize (px), fontWeight (100–900), italic, fill, align (left|center|right), lineHeight (multiplier), letterSpacing (px), uppercase, stroke, strokeWidth. Text wraps inside w; its height follows the content (get_design reports the measured h).
 - shape: shape (rect|ellipse|triangle|star|line), fill, stroke, strokeWidth, cornerRadius (rect only). A line is drawn horizontally through the middle of its box using stroke/strokeWidth.
-- image: pictures. You cannot generate images, but you may move, resize, layer, round (cornerRadius) or crop them${project ? ", and place images from the project folder with place_project_image" : ""}. An image always covers its box without stretching; crop {x, y, zoom} zooms in (1–10) and picks the visible part (x/y 0–1, 0.5 = centered; e.g. y 0.2 keeps a face near the top).
+- image: pictures. You cannot generate images, but you may move, resize, layer, round (cornerRadius) or crop them${project ? ", and place images from the project folder with place_project_image" : ""}. An image always covers its box without stretching; crop {x, y, zoom} zooms in (1–10) and picks the visible part (x/y 0–1, 0.5 = centered; e.g. y 0.2 keeps a face near the top). Frame a photo with mask (circle|arch|triangle|star|hexagon|heart|blob), tune it with adjust {brightness, contrast, saturation} (each -100…100; saturation -100 = black and white), and lay a color over it with overlay {color, opacity} so text on top stays readable.
+- icon: a line icon from the Lucide set (no brand logos): icon (its name, found with search_icons), color, strokeWidth (in a 24-unit grid; 2 is standard, 1.5 lighter). Square boxes look best. Use icons for contact details, features and calls to action, sized to match nearby text.
+- qr: a QR code: data (a URL, or a WhatsApp link https://wa.me/<country code + number>?text=<message>), color, background ("transparent" allowed). Always square; keep strong contrast and at least ~12% of the page width so it scans.
 Any element also takes opacity (0–1), name, and shadow {color, blur, offsetX, offsetY}.
 Elements with the same groupId form a group the user selects and moves as one; group parts that belong together (a button and its label, a badge) with group_elements.
 A design can have several pages (a carousel or slide set); the tools act on the open page (get_design says which). For a carousel, finish page 1, then add_page for each next slide (copy_current: true to keep the layout and change the copy), keeping one visual system across slides.
@@ -101,14 +104,21 @@ const element = {
   type: "object",
   description: "An element; include type plus the fields for that type.",
   properties: {
-    type: { type: "string", enum: ["text", "shape"] },
+    type: { type: "string", enum: ["text", "shape", "icon", "qr"] },
     name: str, x: num, y: num, w: num, h: num, rotation: num, opacity: num,
     text: str, fontFamily: str, fontSize: num, fontWeight: num, italic: { type: "boolean" }, align: { type: "string", enum: ["left", "center", "right"] },
     lineHeight: num, letterSpacing: num, uppercase: { type: "boolean" },
     shape: { type: "string", enum: ["rect", "ellipse", "triangle", "star", "line"] }, cornerRadius: num,
     fill, stroke: str, strokeWidth: num,
     shadow: obj({ color: str, blur: num, offsetX: num, offsetY: num }),
+    icon: { ...str, description: "Icon name from search_icons" },
+    color: { ...str, description: "Icon or QR code color" },
+    data: { ...str, description: "QR code content" },
+    background: { ...str, description: "QR code background" },
     crop: { ...obj({ x: num, y: num, zoom: num }), description: "Images only (update_elements)" },
+    mask: { type: "string", enum: ["circle", "arch", "triangle", "star", "hexagon", "heart", "blob"], description: "Images only: frame shape" },
+    adjust: { ...obj({ brightness: num, contrast: num, saturation: num }), description: "Images only" },
+    overlay: { ...obj({ color: str, opacity: num }), description: "Images only" },
   },
   required: ["type", "x", "y", "w"],
 };
@@ -137,6 +147,11 @@ export function tools(vision: boolean, project: boolean): ToolDef[] {
       name: "reorder",
       description: "Moves elements in the stack.",
       parameters: obj({ ids: { type: "array", items: str }, to: { type: "string", enum: ["front", "back", "forward", "backward"] } }, ["ids", "to"]),
+    },
+    {
+      name: "search_icons",
+      description: "Finds Lucide icon names for an English keyword (e.g. phone, location, calendar, gift, instagram). Returns up to 40 names to use as an icon element's icon.",
+      parameters: obj({ query: str }, ["query"]),
     },
     { name: "group_elements", description: "Groups elements (at least two) so they select and move as one, with an optional name shown in the Layers panel. Returns the group id.", parameters: obj({ ids: { type: "array", items: str }, name: str }, ["ids"]) },
     { name: "ungroup_elements", description: "Dissolves the groups the given elements belong to.", parameters: obj({ ids: { type: "array", items: str } }, ["ids"]) },
@@ -227,15 +242,25 @@ export function describe(): unknown {
         return { ...common, text, fontFamily, fontSize, fontWeight, italic, fill, align, lineHeight, letterSpacing, uppercase, stroke, strokeWidth };
       }
       if (e.type === "shape") return { ...common, shape: e.shape, fill: e.fill, stroke: e.stroke, strokeWidth: e.strokeWidth, cornerRadius: e.cornerRadius };
-      return { ...common, cornerRadius: e.cornerRadius, crop: e.crop };
+      if (e.type === "icon") return { ...common, icon: e.icon, color: e.color, strokeWidth: e.strokeWidth };
+      if (e.type === "qr") return { ...common, data: e.data, color: e.color, background: e.background };
+      return { ...common, cornerRadius: e.cornerRadius, crop: e.crop, mask: e.mask, adjust: e.adjust, overlay: e.overlay };
     }),
   };
+}
+
+/** Rejects icon names the library does not have, so the model looks them up instead of guessing. */
+async function checkIcons(els: El[]) {
+  if (!els.some((e) => e.type === "icon")) return;
+  const lib = await loadIcons();
+  const unknown = els.flatMap((e) => (e.type === "icon" && !lib[e.icon] ? [e.icon] : []));
+  if (unknown.length) throw new Error(`unknown icon ${unknown.join(", ")}; find names with search_icons`);
 }
 
 /** Normalizes AI input into an element; unknown fonts fall back to Inter (installed ones the user picked are kept). */
 function toElement(raw: Record<string, unknown>, id: string): El {
   const el = normalizeElement(raw, id);
-  if (!el) throw new Error(`invalid element type ${String(raw.type)}; use text or shape`);
+  if (!el) throw new Error(raw.type === "icon" ? "an icon needs an icon name (search_icons)" : raw.type === "qr" ? "a QR code needs data" : `invalid element type ${String(raw.type)}; use text, shape, icon or qr`);
   if (el.type === "text") {
     if (!fontInfo(el.fontFamily)) el.fontFamily = "Inter";
     el.fontWeight = nearestWeight(el.fontFamily, el.fontWeight);
@@ -305,9 +330,14 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
       store.update((d) => void (d.elements = d.elements.filter((e) => e.type === "image")));
       store.select([]);
       return { ok: true };
+    case "search_icons": {
+      const names = searchIcons(await loadIcons(), String(a.query ?? ""), 40);
+      return names.length ? names.join(", ") : `no icon matches "${String(a.query)}"; try a simpler English word`;
+    }
     case "add_elements": {
       if (!Array.isArray(a.elements)) throw new Error("elements must be an array");
       const els = (a.elements as Record<string, unknown>[]).map((e) => toElement(e, ""));
+      await checkIcons(els);
       const added = store.add(els.map(({ id: _id, ...e }) => e));
       await settle(els);
       return { ids: added };
@@ -322,6 +352,7 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
         const next = cur.type === "image" ? normalizeElement({ ...cur, ...rest, type: "image", src: cur.src }, cur.id) : toElement({ ...cur, ...rest, type: cur.type }, cur.id);
         return next ? [{ id: cur.id, patch: next }] : [];
       });
+      await checkIcons(patches.map((p) => p.patch as El));
       store.patchMany(patches);
       await settle(patches.map((p) => p.patch as El));
       return missing.length ? { updated: patches.length, not_found: missing } : { updated: patches.length };

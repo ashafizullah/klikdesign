@@ -5,6 +5,8 @@ import { useDesign } from "../store/design";
 import { renderPage, textLines } from "./stage";
 import { designToSvg } from "./svg";
 import { imageDataUri, loadImage } from "./images";
+import { adjustedImage } from "./imageAdjust";
+import { iconPaths, loadIcons } from "./icons";
 import { pageCount } from "./pages";
 import { ensureFonts } from "./fonts";
 
@@ -26,13 +28,25 @@ async function buildPage(format: ExportFormat, scale: number): Promise<Uint8Arra
     case "svg": {
       const images: Record<string, string> = {};
       const sizes: Record<string, { w: number; h: number }> = {};
+      const icons: Record<string, string[]> = {};
       for (const e of d.elements) {
-        if (e.type !== "image" || images[e.src]) continue;
-        images[e.src] = await imageDataUri(e.src);
+        if (e.type === "icon") {
+          icons[e.icon] ??= iconPaths(await loadIcons(), e.icon) ?? [];
+          continue;
+        }
+        if (e.type !== "image") continue;
         const img = await loadImage(e.src);
-        sizes[e.src] = { w: img.naturalWidth, h: img.naturalHeight };
+        if (e.adjust) {
+          // The adjusted pixels, keyed by element.
+          const c = adjustedImage(img, e.adjust);
+          images[e.id] = c.toDataURL(/\.(png|svg|webp|gif)$/i.test(e.src) ? "image/png" : "image/jpeg", 0.92);
+          sizes[e.id] = { w: c.width, h: c.height };
+        } else if (!images[e.src]) {
+          images[e.src] = await imageDataUri(e.src);
+          sizes[e.src] = { w: img.naturalWidth, h: img.naturalHeight };
+        }
       }
-      return new TextEncoder().encode(designToSvg(d, { lines: textLines(), images, sizes }));
+      return new TextEncoder().encode(designToSvg(d, { lines: textLines(), images, sizes, icons }));
     }
   }
 }
@@ -53,7 +67,10 @@ async function pdfOf(pngs: string[]): Promise<Uint8Array> {
 async function settlePage() {
   const { elements } = useDesign.getState().design;
   await ensureFonts(elements.flatMap((e) => (e.type === "text" ? [e.fontFamily] : [])));
-  await Promise.all(elements.flatMap((e) => (e.type === "image" ? [loadImage(e.src).catch(() => null)] : [])));
+  const images = await Promise.all(elements.flatMap((e) => (e.type === "image" ? [loadImage(e.src).then((img) => e.adjust && adjustedImage(img, e.adjust), () => null)] : [])));
+  if (elements.some((e) => e.type === "icon")) await loadIcons();
+  // Adjusted photos swap in a few milliseconds after their pixels are ready.
+  if (images.some(Boolean)) await new Promise((res) => setTimeout(res, 60));
   await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
 }
 

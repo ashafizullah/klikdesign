@@ -12,7 +12,8 @@ import { useT } from "../../i18n";
 import { Empty } from "../ui";
 import { ElementThumb } from "./DesignPreview";
 
-const label = (e: El) => e.name || (e.type === "text" ? e.text.split("\n")[0].slice(0, 40) : e.type === "shape" ? e.shape : "image");
+const label = (e: El) =>
+  e.name || (e.type === "text" ? e.text.split("\n")[0].slice(0, 40) : e.type === "shape" ? e.shape : e.type === "icon" ? e.icon : e.type === "qr" ? `QR · ${e.data.replace(/^https?:\/\//, "")}`.slice(0, 40) : "image");
 
 /** Moves the element at top-first index `from` so it lands before top-first index `to` (`to` may be the length). */
 export function moveLayer(elements: El[], from: number, to: number): El[] {

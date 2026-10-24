@@ -1,9 +1,11 @@
 // HTML/CSS rendering of a design for previews (templates). CSS wraps text the
 // same way the canvas does closely enough for a thumbnail, without a Konva stage.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import type { Design, El, Fill } from "../../types/design";
+import type { Design, El, Fill, IconEl, QrEl } from "../../types/design";
 import { isGradient } from "../../types/design";
-import { polygonPoints } from "../../lib/geometry";
+import { maskPath, polygonPoints } from "../../lib/geometry";
+import { iconPaths, loadIcons, useIcons } from "../../lib/icons";
+import { qrPath } from "../../lib/qr";
 import { ensureFont, ensureFonts } from "../../lib/fonts";
 import { useImage } from "../../lib/images";
 
@@ -53,7 +55,8 @@ function Item({ e }: { e: El }) {
       </div>
     );
   }
-  if (e.type === "image") return <div style={{ ...base, height: e.h, background: "#d4d4d8", borderRadius: e.cornerRadius }} />;
+  if (e.type === "image") return <div style={{ ...base, height: e.h, background: "#d4d4d8", borderRadius: e.cornerRadius, clipPath: e.mask ? `path("${maskPath(e.mask, e.w, e.h)}")` : undefined }} />;
+  if (e.type === "icon" || e.type === "qr") return <svg style={{ ...base, height: e.h, overflow: "visible" }} viewBox={`0 0 ${e.w} ${e.h}`}><MarkSvg e={e} /></svg>;
   if (e.shape === "line") return <div style={{ ...base, top: e.y + e.h / 2 - (e.strokeWidth ?? 4) / 2, height: e.strokeWidth ?? 4, background: e.stroke, borderRadius: 99 }} />;
   return (
     <div
@@ -91,6 +94,27 @@ export function DesignPreview({ design, className = "" }: { design: Design; clas
   );
 }
 
+/** An icon or QR code as SVG in its own w×h box (previews and the asset panel). */
+export function MarkSvg({ e }: { e: Pick<IconEl, "icon" | "color" | "strokeWidth" | "w" | "h"> & { type: "icon" } | Pick<QrEl, "data" | "color" | "background" | "w" | "h"> & { type: "qr" } }) {
+  const lib = useIcons((s) => s.lib);
+  useEffect(() => void (e.type === "icon" && loadIcons()), [e.type]);
+  if (e.type === "qr") {
+    const qr = qrPath(e.data);
+    if (!qr) return null;
+    return (
+      <>
+        {e.background !== "transparent" && <rect width={e.w} height={e.h} fill={e.background} />}
+        <path transform={`scale(${e.w / qr.size})`} d={qr.path} fill={e.color} />
+      </>
+    );
+  }
+  return (
+    <g transform={`scale(${e.w / 24} ${e.h / 24})`} fill="none" stroke={e.color} strokeWidth={e.strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {(iconPaths(lib, e.icon) ?? []).map((d, i) => <path key={i} d={d} />)}
+    </g>
+  );
+}
+
 /** Relative luminance (0–1) of a #rgb/#rrggbb color; mid-grey for anything else. */
 function luminance(c: string): number {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
@@ -104,7 +128,8 @@ function luminance(c: string): number {
 export function ElementThumb({ e, size = 32 }: { e: El; size?: number }) {
   const img = useImage(e.type === "image" ? e.src : "");
   useEffect(() => void (e.type === "text" && ensureFont(e.fontFamily)), [e]);
-  const color = e.type === "image" ? "#888" : e.type === "shape" && e.shape === "line" ? (e.stroke ?? "#888") : isGradient(e.fill) ? e.fill.colors[0] : e.fill;
+  const color =
+    e.type === "image" ? "#888" : e.type === "icon" || e.type === "qr" ? e.color : e.type === "shape" && e.shape === "line" ? (e.stroke ?? "#888") : isGradient(e.fill) ? e.fill.colors[0] : e.fill;
   // Light marks get a dark tile and dark marks a light one, so every layer stays visible.
   const bg = luminance(color) > 0.55 ? "#1f2023" : "#e7e7ea";
   const box: CSSProperties = { width: size, height: size, background: bg };
@@ -134,6 +159,13 @@ export function ElementThumb({ e, size = 32 }: { e: El; size?: number }) {
         >
           Aa
         </span>
+      </div>
+    );
+  }
+  if (e.type === "icon" || e.type === "qr") {
+    return (
+      <div className="flex shrink-0 items-center justify-center overflow-hidden rounded border border-line p-1" style={box}>
+        <svg viewBox={`0 0 ${e.w} ${e.h}`} className="h-full w-full"><MarkSvg e={e.type === "icon" ? { ...e, strokeWidth: Math.max(e.strokeWidth, 2.5) } : e} /></svg>
       </div>
     );
   }

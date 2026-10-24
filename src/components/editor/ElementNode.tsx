@@ -1,11 +1,14 @@
 // One design element on the Konva canvas. Each element is a Group placed at
 // (x, y) with rotation; its shape is drawn inside the 0…w × 0…h box.
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type Konva from "konva";
-import { Ellipse, Group, Image as KImage, Line, Rect, Text } from "react-konva";
-import type { El, Fill, ImageEl, Shadow, TextEl } from "../../types/design";
+import { Ellipse, Group, Image as KImage, Line, Path, Rect, Text } from "react-konva";
+import type { El, Fill, IconEl, ImageEl, QrEl, Shadow, TextEl } from "../../types/design";
 import { isGradient } from "../../types/design";
-import { colorStops, gradientPoints, imageCrop, polygonPoints } from "../../lib/geometry";
+import { colorStops, gradientPoints, imageCrop, maskPath, polygonPoints } from "../../lib/geometry";
+import { useAdjusted, sizeOf } from "../../lib/imageAdjust";
+import { iconPaths, loadIcons, useIcons } from "../../lib/icons";
+import { qrPath } from "../../lib/qr";
 import { useImage } from "../../lib/images";
 import { useFonts } from "../../lib/fonts";
 
@@ -55,24 +58,60 @@ function TextShape({ el, editing }: { el: TextEl; editing: boolean }) {
 }
 
 function ImageShape({ el }: { el: ImageEl }) {
-  const img = useImage(el.src);
-  if (!img) return <Rect width={el.w} height={el.h} fill="#e5e7eb" cornerRadius={el.cornerRadius} />;
-  const { x, y, width, height } = imageCrop(img.naturalWidth, img.naturalHeight, el.w, el.h, el.crop);
+  const img = useAdjusted(useImage(el.src), el.adjust);
+  const radius = el.mask ? undefined : el.cornerRadius;
+  let body;
+  if (!img) body = <Rect width={el.w} height={el.h} fill="#e5e7eb" cornerRadius={radius} />;
+  else {
+    const size = sizeOf(img);
+    const { x, y, width, height } = imageCrop(size.w, size.h, el.w, el.h, el.crop);
+    body = <KImage image={img} width={el.w} height={el.h} crop={{ x, y, width, height }} cornerRadius={radius} {...(el.mask || el.overlay ? {} : shadowProps(el.shadow))} />;
+  }
+  if (!el.mask && !el.overlay) return body;
+  // A frame clips the photo (and its overlay) to its shape.
+  const clip = el.mask ? new Path2D(maskPath(el.mask, el.w, el.h)) : null;
   return (
-    <KImage
-      image={img}
-      width={el.w}
-      height={el.h}
-      crop={{ x, y, width, height }}
-      cornerRadius={el.cornerRadius}
-      {...shadowProps(el.shadow)}
-    />
+    <Group clipFunc={clip ? () => [clip] : undefined}>
+      {body}
+      {el.overlay && <Rect width={el.w} height={el.h} fill={el.overlay.color} opacity={el.overlay.opacity} cornerRadius={radius} listening={false} />}
+    </Group>
+  );
+}
+
+function IconShape({ el }: { el: IconEl }) {
+  const lib = useIcons((s) => s.lib);
+  useEffect(() => void loadIcons(), []);
+  const paths = iconPaths(lib, el.icon) ?? [];
+  return (
+    <>
+      {/* The strokes alone would only be clickable on their lines. */}
+      <Rect width={el.w} height={el.h} fill="transparent" />
+      <Group scaleX={el.w / 24} scaleY={el.h / 24} {...shadowProps(el.shadow)}>
+        {paths.map((d, i) => (
+          <Path key={i} data={d} stroke={el.color} strokeWidth={el.strokeWidth} lineCap="round" lineJoin="round" fillEnabled={false} listening={false} />
+        ))}
+      </Group>
+    </>
+  );
+}
+
+function QrShape({ el }: { el: QrEl }) {
+  const qr = qrPath(el.data);
+  if (!qr) return <Rect width={el.w} height={el.h} fill="#fee2e2" stroke="#dc2626" strokeWidth={2} dash={[6, 4]} />;
+  const k = el.w / qr.size;
+  return (
+    <>
+      <Rect width={el.w} height={el.h} fill={el.background === "transparent" ? "transparent" : el.background} {...shadowProps(el.shadow)} />
+      <Path data={qr.path} fill={el.color} scaleX={k} scaleY={k} listening={false} />
+    </>
   );
 }
 
 function Body({ el, editing }: { el: El; editing: boolean }) {
   if (el.type === "text") return <TextShape el={el} editing={editing} />;
   if (el.type === "image") return <ImageShape el={el} />;
+  if (el.type === "icon") return <IconShape el={el} />;
+  if (el.type === "qr") return <QrShape el={el} />;
   const fill = fillProps(el.fill, el.w, el.h);
   const stroke = { stroke: el.stroke, strokeWidth: el.stroke ? el.strokeWidth : 0, ...shadowProps(el.shadow) };
   switch (el.shape) {

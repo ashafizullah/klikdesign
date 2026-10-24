@@ -70,15 +70,50 @@ export interface Crop {
   zoom: number;
 }
 
+/** Shapes a photo can be framed in (cut to). */
+export const MASKS = ["circle", "arch", "triangle", "star", "hexagon", "heart", "blob"] as const;
+export type Mask = (typeof MASKS)[number];
+
+/** Photo adjustments, each -100…100 (0 = unchanged; saturation -100 = black and white). */
+export interface Adjust {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+}
+
 export interface ImageEl extends Base {
   type: "image";
   /** Path of the image inside the design's media folder. */
   src: string;
   cornerRadius?: number;
   crop?: Crop;
+  /** Frame shape the photo is cut to. */
+  mask?: Mask;
+  adjust?: Adjust;
+  /** A color laid over the photo, e.g. to keep text on it readable. */
+  overlay?: { color: string; opacity: number };
 }
 
-export type El = TextEl | ShapeEl | ImageEl;
+/** A Lucide icon, drawn as strokes in its 24×24 grid scaled to the box. */
+export interface IconEl extends Base {
+  type: "icon";
+  /** Lucide name, e.g. "map-pin". */
+  icon: string;
+  color: string;
+  /** Stroke width in the icon's 24-unit grid (Lucide's default is 2). */
+  strokeWidth: number;
+}
+
+/** A QR code for `data` (a link, a WhatsApp chat link, text); always square. */
+export interface QrEl extends Base {
+  type: "qr";
+  data: string;
+  color: string;
+  /** Behind the code, including its quiet zone; "transparent" for none. */
+  background: string;
+}
+
+export type El = TextEl | ShapeEl | ImageEl | IconEl | QrEl;
 export type ElType = El["type"];
 /** An element before it gets an id. */
 export type NewEl = El extends infer T ? (T extends El ? Omit<T, "id"> : never) : never;
@@ -162,6 +197,20 @@ function normalizeShadow(v: unknown): Shadow | null {
   return { color: color(s.color, "rgba(0,0,0,0.35)"), blur: clamp(num(s.blur, 12), 0, 200), offsetX: num(s.offsetX, 0), offsetY: num(s.offsetY, 4) };
 }
 
+function normalizeAdjust(v: unknown): Adjust | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const a = v as Partial<Adjust>;
+  const adjust = { brightness: clamp(num(a.brightness, 0), -100, 100), contrast: clamp(num(a.contrast, 0), -100, 100), saturation: clamp(num(a.saturation, 0), -100, 100) };
+  return adjust.brightness || adjust.contrast || adjust.saturation ? adjust : undefined;
+}
+
+function normalizeOverlay(v: unknown): ImageEl["overlay"] {
+  if (!v || typeof v !== "object") return undefined;
+  const o = v as { color?: unknown; opacity?: unknown };
+  const opacity = clamp(num(o.opacity, 0.4), 0, 1);
+  return opacity > 0 ? { color: color(o.color, "#000000"), opacity } : undefined;
+}
+
 function normalizeCrop(v: unknown): Crop | undefined {
   if (!v || typeof v !== "object") return undefined;
   const c = v as Partial<Crop>;
@@ -222,7 +271,24 @@ export function normalizeElement(raw: Record<string, unknown>, id: string): El |
     }
     case "image":
       if (typeof raw.src !== "string" || !raw.src) return null;
-      return { ...base, type: "image", src: raw.src, cornerRadius: clamp(num(raw.cornerRadius, 0), 0, 2000) || undefined, crop: normalizeCrop(raw.crop) };
+      return {
+        ...base,
+        type: "image",
+        src: raw.src,
+        cornerRadius: clamp(num(raw.cornerRadius, 0), 0, 2000) || undefined,
+        crop: normalizeCrop(raw.crop),
+        mask: MASKS.includes(raw.mask as Mask) ? (raw.mask as Mask) : undefined,
+        adjust: normalizeAdjust(raw.adjust),
+        overlay: normalizeOverlay(raw.overlay),
+      };
+    case "icon":
+      if (typeof raw.icon !== "string" || !/^[a-z0-9-]{1,60}$/.test(raw.icon)) return null;
+      return { ...base, type: "icon", icon: raw.icon, color: color(raw.color, "#111111"), strokeWidth: clamp(num(raw.strokeWidth, 2), 0.5, 6) };
+    case "qr": {
+      if (typeof raw.data !== "string" || !raw.data.trim()) return null;
+      const size = Math.max(base.w, 24);
+      return { ...base, w: size, h: size, type: "qr", data: raw.data.slice(0, 1200), color: color(raw.color, "#111111"), background: color(raw.background, "#ffffff") };
+    }
     default:
       return null;
   }

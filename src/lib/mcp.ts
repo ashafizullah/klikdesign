@@ -183,7 +183,7 @@ async function run(name: string, a: ToolArgs): Promise<unknown> {
 
 const ALLOWED = new Set(TOOLS.map((t) => t.name));
 const DESIGNLESS = new Set(["list_designs", "open_design", "create_design"]);
-const READ_ONLY = new Set(["list_designs", "get_design_guide", "get_design", "view_design", "list_project_images", "view_project_image", "list_design_images", "view_design_image", "list_installed_fonts"]);
+const READ_ONLY = new Set(["list_designs", "get_design_guide", "get_design", "view_design", "list_project_images", "view_project_image", "list_design_images", "view_design_image", "list_installed_fonts", "search_icons"]);
 
 function toContent(out: unknown): Content[] {
   if (out instanceof WithImage) return [{ type: "text", text: out.content }, { type: "image", data: out.image.data, mimeType: out.image.mediaType }];

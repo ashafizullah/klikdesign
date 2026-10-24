@@ -5,8 +5,11 @@ import {
   ChevronDown, ChevronUp, Copy, Crop, Group, Italic, Lock, RotateCcw, Trash2, Ungroup, Unlock,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import type { El, Fill, ImageEl, ShapeEl, Shadow, TextEl } from "../../types/design";
-import { SIZE_PRESETS, isGradient, solidOf } from "../../types/design";
+import { useState } from "react";
+import type { Adjust, El, Fill, IconEl, ImageEl, Mask, QrEl, ShapeEl, Shadow, TextEl } from "../../types/design";
+import { MASKS, SIZE_PRESETS, isGradient, solidOf } from "../../types/design";
+import { maskPath } from "../../lib/geometry";
+import { parseWaLink, qrPath, waLink } from "../../lib/qr";
 import { useDesign } from "../../store/design";
 import { useUi } from "../../store/ui";
 import { ensureFont, fontInfo, nearestWeight } from "../../lib/fonts";
@@ -31,6 +34,8 @@ export function Inspector() {
       {one?.type === "text" && <TextProps el={one} />}
       {one?.type === "shape" && <ShapeProps el={one} />}
       {one?.type === "image" && <ImageProps el={one} />}
+      {one?.type === "icon" && <IconProps el={one} />}
+      {one?.type === "qr" && <QrProps el={one} />}
       {one && <Geometry el={one} />}
       <Section title={t("insp.effects")}>
         <Slider label={t("insp.opacity")} min={0} max={1} value={one?.opacity ?? 1} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => patchAll(sel, { opacity: v })} />
@@ -242,8 +247,145 @@ function ImageProps({ el }: { el: ImageEl }) {
         <IconButton title={t("crop.reset")} disabled={!el.crop} onClick={() => patch(el.id, { crop: undefined })}><RotateCcw size={15} /></IconButton>
       </div>
       <Slider label={t("crop.zoom")} min={1} max={5} step={0.01} value={crop.zoom} format={(v) => `${Math.round(v * 100)}%`} onChange={(zoom) => patch(el.id, { crop: { ...crop, zoom } })} />
-      <Slider label={t("insp.radius")} min={0} max={Math.min(el.w, el.h) / 2} step={1} value={el.cornerRadius ?? 0} format={(v) => `${Math.round(v)}px`} onChange={(cornerRadius) => patch(el.id, { cornerRadius: cornerRadius || undefined })} />
+      {!el.mask && <Slider label={t("insp.radius")} min={0} max={Math.min(el.w, el.h) / 2} step={1} value={el.cornerRadius ?? 0} format={(v) => `${Math.round(v)}px`} onChange={(cornerRadius) => patch(el.id, { cornerRadius: cornerRadius || undefined })} />}
+      <span className="label">{t("frame.title")}</span>
+      <FramePicker value={el.mask} onChange={(mask) => patch(el.id, { mask })} />
+      <AdjustProps el={el} />
     </Section>
+  );
+}
+
+/** Frame shapes as small tiles; the first one removes the frame. */
+export function FramePicker({ value, onChange, disabled }: { value?: Mask; onChange(m: Mask | undefined): void; disabled?: boolean }) {
+  const t = useT();
+  return (
+    <div className="grid grid-cols-4 gap-1.5">
+      {[undefined, ...MASKS].map((m) => (
+        <button
+          key={m ?? "none"}
+          disabled={disabled}
+          title={t(`frame.${m ?? "none"}`)}
+          onClick={() => onChange(m)}
+          className={`flex aspect-square items-center justify-center rounded-md border p-1.5 disabled:opacity-40 ${value === m ? "border-accent bg-accent/10" : "border-line bg-panel-2 hover:border-muted"}`}
+        >
+          <svg viewBox="0 0 40 40" className="h-full w-full">
+            {m ? <path d={maskPath(m, 40, 40)} className="fill-muted/70" /> : <rect x="2" y="2" width="36" height="36" rx="3" className="fill-none stroke-muted" strokeDasharray="4 3" />}
+          </svg>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AdjustProps({ el }: { el: ImageEl }) {
+  const t = useT();
+  const a = el.adjust ?? { brightness: 0, contrast: 0, saturation: 0 };
+  const set = (x: Partial<Adjust>) => {
+    const next = { ...a, ...x };
+    patch(el.id, { adjust: next.brightness || next.contrast || next.saturation ? next : undefined });
+  };
+  const o = el.overlay;
+  const signed = (v: number) => (v > 0 ? `+${Math.round(v)}` : String(Math.round(v)));
+  return (
+    <>
+      <div className="flex items-center justify-between pt-1">
+        <span className="label mb-0">{t("adjust.title")}</span>
+        <button className="text-[11px] text-muted hover:text-text disabled:opacity-40" disabled={!el.adjust} onClick={() => patch(el.id, { adjust: undefined })}>{t("adjust.reset")}</button>
+      </div>
+      <Slider label={t("adjust.brightness")} min={-100} max={100} step={1} value={a.brightness} format={signed} onChange={(brightness) => set({ brightness })} />
+      <Slider label={t("adjust.contrast")} min={-100} max={100} step={1} value={a.contrast} format={signed} onChange={(contrast) => set({ contrast })} />
+      <Slider label={t("adjust.saturation")} min={-100} max={100} step={1} value={a.saturation} format={signed} onChange={(saturation) => set({ saturation })} />
+      <Button className="w-full" onClick={() => set({ saturation: a.saturation === -100 ? 0 : -100 })}>
+        {t(a.saturation === -100 ? "adjust.color" : "adjust.bw")}
+      </Button>
+      <label className="flex items-center justify-between pt-1">
+        <span className="label mb-0">{t("adjust.overlay")}</span>
+        <input type="checkbox" checked={!!o} onChange={(e) => patch(el.id, { overlay: e.target.checked ? { color: "#000000", opacity: 0.4 } : undefined })} />
+      </label>
+      {o && (
+        <>
+          <ColorField value={o.color} onChange={(color) => patch(el.id, { overlay: { ...o, color } })} />
+          <Slider label={t("insp.opacity")} min={0.05} max={0.95} value={o.opacity} format={(v) => `${Math.round(v * 100)}%`} onChange={(opacity) => patch(el.id, { overlay: { ...o, opacity } })} />
+        </>
+      )}
+    </>
+  );
+}
+
+function IconProps({ el }: { el: IconEl }) {
+  const t = useT();
+  return (
+    <Section title={`${t("type.icon")} · ${el.icon}`}>
+      <span className="label">{t("insp.color")}</span>
+      <ColorField value={el.color} onChange={(color) => patch(el.id, { color })} />
+      <BrandSwatches onPick={(color) => patch(el.id, { color })} />
+      <Slider label={t("icon.stroke")} min={0.5} max={4} step={0.25} value={el.strokeWidth} onChange={(strokeWidth) => patch(el.id, { strokeWidth })} />
+      <Button className="w-full" onClick={() => useUi.getState().setLeftTab("elements")}>{t("icon.change")}</Button>
+    </Section>
+  );
+}
+
+function QrProps({ el }: { el: QrEl }) {
+  const t = useT();
+  const ok = !!qrPath(el.data);
+  return (
+    <Section title={t("type.qr")}>
+      <QrDataEditor value={el.data} onChange={(data) => patch(el.id, { data })} />
+      {!ok && <p className="text-[11px] text-danger">{t("qr.tooLong")}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <span className="label">{t("qr.color")}</span>
+          <ColorField value={el.color} onChange={(color) => patch(el.id, { color })} />
+        </div>
+        <div>
+          <span className="label">{t("qr.background")}</span>
+          <ColorField value={el.background} onChange={(background) => patch(el.id, { background })} />
+        </div>
+      </div>
+      <BrandSwatches onPick={(color) => patch(el.id, { color })} />
+      <p className="text-[11px] leading-relaxed text-muted">{t("qr.hint")}</p>
+    </Section>
+  );
+}
+
+/** Link, WhatsApp chat or plain text for a QR code. */
+export function QrDataEditor({ value, onChange }: { value: string; onChange(data: string): void }) {
+  const t = useT();
+  const wa = parseWaLink(value);
+  const [mode, setMode] = useState<"link" | "wa" | "text">(wa ? "wa" : /^https?:\/\//i.test(value) || !value ? "link" : "text");
+  return (
+    <div className="space-y-2">
+      <div className="flex rounded-md border border-line p-0.5 text-[11px]">
+        {(["link", "wa", "text"] as const).map((m) => (
+          <button key={m} onClick={() => setMode(m)} className={`flex-1 rounded px-2 py-1 ${mode === m ? "bg-panel-2 text-accent" : "text-muted hover:text-text"}`}>
+            {t(`qr.mode.${m}`)}
+          </button>
+        ))}
+      </div>
+      {mode === "wa" ? (
+        <>
+          <input className="field" inputMode="tel" placeholder="0812 3456 7890" value={wa?.phone ?? ""} onChange={(e) => onChange(waLink(e.target.value, wa?.text))} />
+          <input className="field" placeholder={t("qr.waMessage")} value={wa?.text ?? ""} onChange={(e) => onChange(waLink(wa?.phone ?? "", e.target.value))} />
+        </>
+      ) : mode === "link" ? (
+        <input className="field" placeholder="https://…" value={value} onChange={(e) => onChange(e.target.value)} spellCheck={false} />
+      ) : (
+        <textarea className="field min-h-14 resize-y" value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </div>
+  );
+}
+
+/** The brand kit's colors as one-click swatches (nothing without a kit). */
+function BrandSwatches({ onPick }: { onPick(c: string): void }) {
+  const t = useT();
+  const brand = useBrandKit(useDesign((s) => s.design.workspaceId));
+  if (!brand.colors.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span className="mr-0.5 text-[10px] text-muted">{t("brand.short")}</span>
+      {brand.colors.map((c) => <button key={c} title={c} onClick={() => onPick(c)} className="h-5 w-5 rounded border border-accent/40" style={{ background: c }} />)}
+    </div>
   );
 }
 

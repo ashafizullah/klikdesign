@@ -1,4 +1,4 @@
-// Asset sidebar: templates, text presets, shapes, uploaded images and the brand kit.
+// Asset sidebar: templates, text presets, elements (shapes, icons, QR codes, frames), uploaded images and the brand kit.
 import { Image as ImageIcon, LayoutTemplate, Palette, Shapes, Type, Upload } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
@@ -17,11 +17,12 @@ import { polygonPoints } from "../../lib/geometry";
 import { useT } from "../../i18n";
 import { Button } from "../ui";
 import { DesignPreview } from "./DesignPreview";
+import { ElementsTab } from "./ElementsTab";
 
-const TABS: { id: LeftTab; icon: typeof Type; label: "left.templates" | "left.text" | "left.shapes" | "left.uploads" | "left.brand" }[] = [
+const TABS: { id: LeftTab; icon: typeof Type; label: "left.templates" | "left.text" | "left.elements" | "left.uploads" | "left.brand" }[] = [
   { id: "templates", icon: LayoutTemplate, label: "left.templates" },
   { id: "text", icon: Type, label: "left.text" },
-  { id: "shapes", icon: Shapes, label: "left.shapes" },
+  { id: "elements", icon: Shapes, label: "left.elements" },
   { id: "uploads", icon: Upload, label: "left.uploads" },
   { id: "brand", icon: Palette, label: "left.brand" },
 ];
@@ -55,7 +56,7 @@ export function LeftPanel() {
       <div className="w-[260px] overflow-y-auto p-3">
         {tab === "templates" && <Templates />}
         {tab === "text" && <TextTab />}
-        {tab === "shapes" && <ShapesTab />}
+        {tab === "elements" && <ElementsTab shapes={<ShapesTab />} />}
         {tab === "uploads" && <Uploads />}
         {tab === "brand" && <BrandTab />}
       </div>
@@ -95,9 +96,9 @@ export function TemplateThumb({ tpl }: { tpl: (typeof TEMPLATES)[number] }) {
 
 /** SVG icon of a shape preset. */
 function ThumbEl({ e }: { e: El }) {
+  if (e.type !== "shape" && e.type !== "image") return null;
   const fill = e.type === "image" ? "#ccc" : typeof e.fill === "string" ? e.fill : e.fill.colors[0];
   const tf = `translate(${e.x} ${e.y}) rotate(${e.rotation})`;
-  if (e.type === "text") return null;
   if (e.type === "image") return <rect transform={tf} width={e.w} height={e.h} fill={fill} />;
   if (e.shape === "ellipse") return <ellipse transform={tf} cx={e.w / 2} cy={e.h / 2} rx={e.w / 2} ry={e.h / 2} fill={fill} opacity={e.opacity} />;
   if (e.shape === "line") return <line transform={tf} x1={0} y1={e.h / 2} x2={e.w} y2={e.h / 2} stroke={e.stroke} strokeWidth={e.strokeWidth} />;
