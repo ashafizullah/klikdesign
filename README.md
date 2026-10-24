@@ -109,6 +109,6 @@ KlikDesign is free. If it saves you time, **[buy me an AI token on Trakteer](htt
 
 [MIT](LICENSE)
 
-The interface fonts (Fraunces, IBM Plex Sans and IBM Plex Mono) are bundled under the SIL Open Font License 1.1; see [`public/licenses/fonts.txt`](public/licenses/fonts.txt), which also ships inside the app.
+The app bundles third-party software, including the interface fonts Fraunces, IBM Plex Sans and IBM Plex Mono (SIL Open Font License 1.1). Their licenses are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), which the app also shows under Settings → Open-source licenses. Run `bun run notices` after changing dependencies.
 
 Claude and Claude Code are trademarks of Anthropic. KlikDesign is an independent project and is not affiliated with or endorsed by Anthropic.
