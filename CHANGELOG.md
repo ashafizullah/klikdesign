@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.3
+
+- New Darkroom look, matching KlikReel: warm charcoal surfaces, tungsten-amber accents and new typography (Fraunces, IBM Plex Sans and IBM Plex Mono, bundled so they work offline)
+- Multi-page designs (carousels): a page strip under the canvas adds, duplicates, reorders and deletes pages. PDF export includes every page; PNG, JPG and SVG export one numbered file per page
+- Brand kit per workspace: colors, fonts, logos and a note on voice, editable from the workspace header or the editor's Brand tab. The AI can fill it by reading the project folder, and follows it when designing
+- Magic resize: fit a design to another format, as a copy or in place
+- Fonts from curated Google Fonts or any font installed on your computer, in a searchable picker, plus a text toolbar above the canvas
+- Layers show a preview of each element and can be reordered by dragging
+- Images live with the design: the Uploads tab lists them, and image files can be dropped onto the canvas
+- AI settings can load the model list from the API and set a reasoning effort per profile; chat replies render Markdown
+- More tools for the AI and Claude Code: pages, resize, brand kit, design images and installed fonts
+
 ## 0.1.2
 
 - Built-in terminal (Ctrl+` or the terminal button in the top bar), opened in the design's project folder
