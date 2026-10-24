@@ -36,7 +36,7 @@ export const isUntitled = (name: string) => !name.trim() || LOCALES.some((l) => 
 function system(vision: boolean, project: string | null): string {
   const { width, height, name } = useDesign.getState().design;
   const fonts = FONTS.map((f) => `${f.family} (${f.category}; weights ${f.weights.join("/")})`).join("\n- ");
-  return `You are a senior graphic designer working inside KlikDesign, a Canva-like poster editor. You design and revise the open page only through tools.
+  return `You are a senior graphic designer working inside KlikDesign, a desktop poster editor. You design and revise the open page only through tools.
 
 The page is ${width}×${height} px. Coordinates are page pixels from the top-left corner; every element has x, y (its top-left corner), w, h and rotation in degrees around that corner. Elements are drawn bottom to top in list order.
 

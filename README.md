@@ -5,7 +5,7 @@
 <h1 align="center">KlikDesign</h1>
 
 <p align="center">
-  A free, open-source, Canva-style poster editor for the desktop. Describe a poster and the AI lays it out; refine it on the canvas or by chat. Bring your own AI keys; designs stay on your machine.
+  A free, open-source poster editor for the desktop. Describe a poster and the AI lays it out; refine it on the canvas or by chat. Bring your own AI keys; designs stay on your machine.
 </p>
 
 <p align="center">
@@ -108,3 +108,7 @@ KlikDesign is free. If it saves you time, **[buy me an AI token on Trakteer](htt
 ## License
 
 [MIT](LICENSE)
+
+The interface fonts (Fraunces, IBM Plex Sans and IBM Plex Mono) are bundled under the SIL Open Font License 1.1; see [`public/licenses/fonts.txt`](public/licenses/fonts.txt), which also ships inside the app.
+
+Claude and Claude Code are trademarks of Anthropic. KlikDesign is an independent project and is not affiliated with or endorsed by Anthropic.
