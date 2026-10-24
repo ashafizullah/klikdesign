@@ -10,6 +10,7 @@ import { ExportDialog } from "./components/dialogs/ExportDialog";
 import { UpdateDialog } from "./components/dialogs/UpdateDialog";
 import { ConfirmDialog } from "./components/dialogs/ConfirmDialog";
 import { ResizeDialog } from "./components/dialogs/ResizeDialog";
+import { HistoryDialog } from "./components/dialogs/HistoryDialog";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import { TooltipLayer } from "./components/ui/TooltipLayer";
 import { useUi } from "./store/ui";
@@ -63,6 +64,7 @@ export default function App() {
       {dialog === "settings" && <SettingsDialog />}
       {dialog === "export" && <ExportDialog />}
       {dialog === "resize" && <ResizeDialog />}
+      {dialog === "history" && <HistoryDialog />}
       <UpdateDialog />
       <ConfirmDialog />
       <TooltipLayer />

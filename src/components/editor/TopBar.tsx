@@ -1,4 +1,4 @@
-import { ArrowLeft, Download, KeyRound, Maximize, Minus, Plus, Redo2, Scaling, SquareTerminal, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, History, KeyRound, Maximize, Minus, Plus, Redo2, Scaling, SquareTerminal, Undo2 } from "lucide-react";
 import { useStore } from "zustand";
 import logo from "../../assets/logo.png";
 import { redo, undo, useDesign } from "../../store/design";
@@ -44,6 +44,7 @@ export function TopBar() {
       <div className="mx-2 h-5 w-px bg-line" />
       <IconButton title={t("top.undo")} disabled={!canUndo} onClick={undo}><Undo2 size={15} /></IconButton>
       <IconButton title={t("top.redo")} disabled={!canRedo} onClick={redo}><Redo2 size={15} /></IconButton>
+      <IconButton title={t("top.history")} onClick={() => open("history")}><History size={15} /></IconButton>
       <div className="flex-1" />
       <div className="flex items-center rounded-md border border-line">
         <IconButton title={t("top.zoomOut")} onClick={() => setZoom(zoom / 1.2)}><Minus size={14} /></IconButton>

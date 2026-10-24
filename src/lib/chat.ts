@@ -4,6 +4,7 @@ import { useDesign } from "../store/design";
 import { localizeMessage, t } from "../i18n";
 import { runAgent } from "./agent";
 import { aiReady } from "../store/settings";
+import { snapshot } from "./versions";
 
 let signal = { cancelled: false };
 
@@ -16,6 +17,8 @@ export async function sendChat(text: string): Promise<void> {
     chat.push({ kind: "error", text: t("err.noAiKey") });
     return;
   }
+  // A version to go back to if the AI's changes are not wanted.
+  await snapshot("ai", text).catch(() => {});
   const empty = useDesign.getState().design.elements.length === 0;
   const prompt = empty ? `Design a new poster for this brief:\n\n${text.trim()}` : text.trim();
   const history = [...chat.history, { role: "user" as const, content: [{ type: "text" as const, text: prompt }] }];

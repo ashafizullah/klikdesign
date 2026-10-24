@@ -58,6 +58,8 @@ export interface Workspace {
 
 export type TerminalEvent = { type: "data"; data: string } | { type: "exit"; code: number | null };
 
+import type { VersionMeta } from "./versions";
+
 export type Pasted =
   | { kind: "files"; paths: string[] }
   | { kind: "image"; path: string }
@@ -84,6 +86,10 @@ export const ipc = {
   mediaImport: (id: string, path: string) => invoke<string>("media_import", { id, path }),
   mediaList: (id: string) => invoke<string[]>("media_list", { id }),
   mediaBytes: (path: string) => invoke<ArrayBuffer>("media_bytes", { path }),
+  versions: (id: string) => invoke<VersionMeta[]>("versions_list", { id }),
+  versionSave: (id: string, meta: Omit<VersionMeta, "id" | "at">, design: string) => invoke<VersionMeta>("version_save", { id, meta, design }),
+  versionLoad: (id: string, version: string) => invoke<string>("version_load", { id, version }),
+  versionDelete: (id: string, version: string) => invoke<void>("version_delete", { id, version }),
   /** The system clipboard; a copied image is stored in design `id`'s media folder. */
   clipboardRead: (id: string) => invoke<Pasted>("clipboard_read", { id }),
   clipboardWrite: (text: string) => invoke<void>("clipboard_write", { text }),

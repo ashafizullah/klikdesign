@@ -6,6 +6,7 @@ const designs = new Map<string, string>();
 const media = new Map<string, Uint8Array>();
 let chatCalls = 0;
 const brands = new Map<string, string>();
+const versions = new Map<string, { meta: { id: string; at: number }; design: string }[]>();
 /** Stand-in for the system clipboard (set from the console with `__mockClipboard("[image]")`). */
 let systemClipboard = "";
 (window as unknown as { __mockClipboard(t: string): void }).__mockClipboard = (t) => void (systemClipboard = t);
@@ -46,6 +47,19 @@ mockIPC(async (cmd, args) => {
       media.set(path, demoSvg(media.size * 70));
       return path;
     }
+    case "versions_list":
+      return [...(versions.get(a.id) ?? [])].reverse().map((v) => v.meta);
+    case "version_save": {
+      const list = versions.get(a.id) ?? [];
+      const meta = { ...a.meta, id: `v${Date.now()}`, at: Date.now() };
+      versions.set(a.id, [...list, { meta, design: a.design }]);
+      return meta;
+    }
+    case "version_load":
+      return versions.get(a.id)?.find((v) => v.meta.id === a.version)?.design;
+    case "version_delete":
+      versions.set(a.id, (versions.get(a.id) ?? []).filter((v) => v.meta.id !== a.version));
+      return null;
     case "clipboard_write":
       systemClipboard = a.text;
       return null;

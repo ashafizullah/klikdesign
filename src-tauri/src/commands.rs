@@ -3,6 +3,7 @@ use crate::ai::{self, ChatRequest, ChatResult, ModelsRequest};
 use crate::clipboard::{Clip, Clipboard};
 use crate::error::{AppError, AppResult};
 use crate::library::{DesignMeta, Library, Workspace};
+use crate::versions::{self, VersionMeta};
 use crate::{keys, workspace};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -95,6 +96,29 @@ pub async fn media_bytes(path: String) -> AppResult<tauri::ipc::Response> {
         return Err(AppError::msg("File is too large to load into memory"));
     }
     Ok(tauri::ipc::Response::new(tokio::fs::read(&path).await?))
+}
+
+// ---- version history -------------------------------------------------------
+
+#[tauri::command]
+pub fn versions_list(id: String, lib: State<'_, Library>) -> AppResult<Vec<VersionMeta>> {
+    versions::list(&lib.design_dir(&id)?.join("versions"))
+}
+
+#[tauri::command]
+pub fn version_save(id: String, meta: VersionMeta, design: String, lib: State<'_, Library>) -> AppResult<VersionMeta> {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+    versions::save(&lib.design_dir(&id)?.join("versions"), meta, &design, now)
+}
+
+#[tauri::command]
+pub fn version_load(id: String, version: String, lib: State<'_, Library>) -> AppResult<String> {
+    versions::load(&lib.design_dir(&id)?.join("versions"), &version)
+}
+
+#[tauri::command]
+pub fn version_delete(id: String, version: String, lib: State<'_, Library>) -> AppResult<()> {
+    versions::delete(&lib.design_dir(&id)?.join("versions"), &version)
 }
 
 // ---- clipboard ------------------------------------------------------------

@@ -8,6 +8,7 @@ import { ipc } from "./ipc";
 import { renderPage, stageReady } from "./stage";
 import { ensureFonts } from "./fonts";
 import { t } from "../i18n";
+import { maybeAutoSnapshot, versionsOnOpen } from "./versions";
 
 function thumbnail(d: Design): string | undefined {
   if (!stageReady()) return undefined;
@@ -31,7 +32,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 useDesign.subscribe((s, prev) => {
   if (s.design === prev.design || !s.dirty || useApp.getState().view !== "editor") return;
   clearTimeout(timer);
-  timer = setTimeout(() => saveNow().catch(notifyError), 800);
+  timer = setTimeout(() => saveNow().then(maybeAutoSnapshot).catch(notifyError), 800);
 });
 
 function enter(design: Design) {
@@ -56,6 +57,8 @@ export async function loadDesign(id: string) {
   const { thumb, ...rest } = JSON.parse(await ipc.designFetch(id)) as Design & { thumb?: string };
   enter(normalizeDesign(rest));
   lastThumb = thumb;
+  // After the canvas shows it, for the thumbnail.
+  setTimeout(() => versionsOnOpen(id).catch(() => {}), 1500);
 }
 
 export async function openDesign(id: string) {

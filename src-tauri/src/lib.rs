@@ -8,6 +8,7 @@ mod library;
 mod mcp;
 mod menu;
 mod terminal;
+mod versions;
 mod workspace;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,6 +55,10 @@ pub fn run() {
             commands::brand_set,
             commands::brand_logo_import,
             commands::media_bytes,
+            commands::versions_list,
+            commands::version_save,
+            commands::version_load,
+            commands::version_delete,
             commands::clipboard_read,
             commands::clipboard_write,
             commands::workspaces_list,

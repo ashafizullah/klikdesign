@@ -21,7 +21,7 @@ interface UiState {
   /** Image whose crop is being adjusted on the canvas. */
   croppingId: string | null;
   setCropping(id: string | null): void;
-  dialog: null | "settings" | "export" | "resize";
+  dialog: null | "settings" | "export" | "resize" | "history";
   /** In-app terminal panel visibility. */
   terminal: boolean;
   toggleTerminal(): void;

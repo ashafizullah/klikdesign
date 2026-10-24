@@ -13,6 +13,7 @@ import { addImage, describe, designGuide, exec as execDesignTool, resizeTarget, 
 import { magicResize } from "./magicResize";
 import { t } from "../i18n";
 import { mediaChanged } from "./media";
+import { snapshotBeforeExternal } from "./versions";
 import { buildExport, numberedPath, type ExportFormat } from "./export";
 import { createDesign, leaveDesign, loadDesign } from "./library";
 import { ipc, type ToolDef } from "./ipc";
@@ -196,6 +197,7 @@ async function handle(call: McpCall) {
     if (!DESIGNLESS.has(call.name) && useApp.getState().view !== "editor") throw new Error("No design is open in KlikDesign. Use list_designs, then open_design or create_design.");
     // The in-app AI writes into the open design too; never interleave with it.
     if (!READ_ONLY.has(call.name) && useChat.getState().busy) throw new Error("KlikDesign's own AI is editing this design right now; wait until it finishes and try again.");
+    if (!READ_ONLY.has(call.name) && useApp.getState().view === "editor") await snapshotBeforeExternal().catch(() => {});
     result = { content: toContent(await run(call.name, call.arguments ?? {})) };
   } catch (e) {
     result = { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
