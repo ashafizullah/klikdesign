@@ -277,6 +277,10 @@ export function Canvas() {
   };
 
   const editing = design.elements.find((e) => e.id === editingId && e.type === "text") as TextEl | undefined;
+  // The edited text went away (another page opened, undo, the AI): stop editing so shortcuts work again.
+  useEffect(() => {
+    if (editingId && !editing) useUi.getState().setEditingText(null);
+  }, [editingId, editing]);
 
   return (
     <div ref={wrap} className="checker-soft relative min-w-0 flex-1 overflow-hidden" style={{ cursor: spaceDown ? "grab" : undefined }}>

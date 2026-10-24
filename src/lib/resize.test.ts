@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { normalizeDesign } from "../store/design";
 import { resizeLayout } from "./resize";
+import { addPage, allPages } from "./pages";
 
 const post = normalizeDesign({
   width: 1080,
@@ -38,4 +39,9 @@ test("backgrounds stretch, content keeps proportions inside the new page", () =>
 test("same size is a no-op on geometry", () => {
   const r = resizeLayout(post, 1080, 1350);
   expect(r.elements.map((e) => [e.x, e.y, e.w, e.h])).toEqual(post.elements.map((e) => [e.x, e.y, e.w, e.h]));
+});
+
+test("every page of a carousel is resized", () => {
+  const r = resizeLayout(addPage(post, true), 1080, 1920);
+  for (const p of allPages(r)) expect(p.elements.find((e) => e.type === "shape" && e.shape === "rect")).toMatchObject({ w: 1080, h: 1920 });
 });

@@ -13,7 +13,7 @@ import { addImage, describe, designGuide, exec as execDesignTool, resizeTarget, 
 import { magicResize } from "./magicResize";
 import { t } from "../i18n";
 import { mediaChanged } from "./media";
-import { buildExport, type ExportFormat } from "./export";
+import { buildExport, numberedPath, type ExportFormat } from "./export";
 import { createDesign, leaveDesign, loadDesign } from "./library";
 import { ipc, type ToolDef } from "./ipc";
 import { WithImage, type ToolArgs } from "./toolLoop";
@@ -36,7 +36,8 @@ Workflow:
 5. view_design after a build or larger change, and fix overlaps, cut-off text, poor contrast or awkward spacing.
 6. To adapt a design to another format (post to story, banner…), call resize_design (copy: true keeps the original and opens the copy), then re-lay it out with update_elements and check it with view_design.
 7. Give an untitled design a short title with rename_design.
-8. export_design when the user asks for a file.
+8. For a carousel or slide set, add pages with add_page and switch with go_to_page; the editing tools act on the open page.
+9. export_design when the user asks for a file (all_pages for every page of a carousel).
 
 The user's product codebase is usually your current working directory: read it for real names, wording, brand colors and logos.`;
 
@@ -82,8 +83,8 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "export_design",
-    description: "Exports the open design to a file. scale multiplies the page size (default 1; 2 for print-quality PNG/PDF).",
-    parameters: obj({ path: { ...str, description: "Absolute output path" }, format: { type: "string", enum: ["png", "jpg", "pdf", "svg"] }, scale: num }, ["path", "format"]),
+    description: "Exports the open design to a file. scale multiplies the page size (default 1; 2 for print-quality PNG/PDF). With all_pages, a PDF holds every page and PNG/JPG/SVG write one file per page (path-1.png, path-2.png…).",
+    parameters: obj({ path: { ...str, description: "Absolute output path" }, format: { type: "string", enum: ["png", "jpg", "pdf", "svg"] }, scale: num, all_pages: { type: "boolean" } }, ["path", "format"]),
   },
 ];
 
@@ -129,11 +130,14 @@ async function exportFile(a: ToolArgs) {
   if (!["png", "jpg", "pdf", "svg"].includes(format)) throw new Error("format must be png, jpg, pdf or svg");
   const path = String(a.path ?? "");
   const scale = Math.min(4, Math.max(0.1, n(a.scale) ?? 1));
-  const bytes = await buildExport(format, scale);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  await invoke("export_write", { path, data: btoa(bin) });
-  return { ok: true, path, bytes: bytes.length };
+  const files = await buildExport(format, scale, a.all_pages === true);
+  const paths = files.length > 1 ? files.map((_, i) => numberedPath(path, i + 1)) : [path];
+  for (const [i, bytes] of files.entries()) {
+    let bin = "";
+    for (let j = 0; j < bytes.length; j += 0x8000) bin += String.fromCharCode(...bytes.subarray(j, j + 0x8000));
+    await invoke("export_write", { path: paths[i], data: btoa(bin) });
+  }
+  return { ok: true, paths, bytes: files.reduce((n, f) => n + f.length, 0) };
 }
 
 async function run(name: string, a: ToolArgs): Promise<unknown> {

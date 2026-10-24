@@ -36,17 +36,20 @@ export async function magicResize(o: ResizeOptions): Promise<void> {
     // Images belong to their design's folder: copy them so the copy stands on its own.
     const id = useDesign.getState().design.id;
     const moved = new Map<string, string>();
-    for (const src of new Set(next.elements.flatMap((e) => (e.type === "image" ? [e.src] : [])))) {
+    const all = [next.elements, ...(next.pages ?? []).map((p) => p.elements)].flat();
+    for (const src of new Set(all.flatMap((e) => (e.type === "image" ? [e.src] : [])))) {
       moved.set(src, await ipc.mediaImport(id, src).catch(() => src));
     }
     if (moved.size) {
-      useDesign.getState().update((d) => d.elements.forEach((e) => e.type === "image" && (e.src = moved.get(e.src) ?? e.src)));
+      useDesign.getState().update((d) =>
+        [d.elements, ...(d.pages ?? []).map((p) => p.elements)].flat().forEach((e) => e.type === "image" && (e.src = moved.get(e.src) ?? e.src)),
+      );
       useDesign.temporal.getState().clear();
       await saveNow();
       mediaChanged();
     }
   } else {
-    useDesign.getState().update((d) => Object.assign(d, { width: next.width, height: next.height, elements: next.elements }));
+    useDesign.getState().update((d) => Object.assign(d, { width: next.width, height: next.height, elements: next.elements, pages: next.pages }));
     useUi.getState().setZoom(null);
   }
   if (o.ai && next.elements.length) {

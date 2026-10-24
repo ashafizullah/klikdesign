@@ -3,6 +3,7 @@ import { Home } from "./components/home/Home";
 import { TopBar } from "./components/editor/TopBar";
 import { LeftPanel } from "./components/editor/LeftPanel";
 import { Canvas } from "./components/editor/Canvas";
+import { PageStrip } from "./components/editor/PageStrip";
 import { RightPanel } from "./components/editor/RightPanel";
 import { SettingsDialog } from "./components/dialogs/SettingsDialog";
 import { ExportDialog } from "./components/dialogs/ExportDialog";
@@ -50,7 +51,10 @@ export default function App() {
           <TopBar />
           <div className="flex min-h-0 flex-1">
             <ErrorBoundary name={t("panel.assets")}><LeftPanel /></ErrorBoundary>
-            <ErrorBoundary name={t("panel.canvas")}><Canvas /></ErrorBoundary>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <ErrorBoundary name={t("panel.canvas")}><Canvas /></ErrorBoundary>
+              <PageStrip />
+            </div>
             <RightPanel />
           </div>
           <ErrorBoundary name={t("panel.terminal")}><TerminalSlot /></ErrorBoundary>

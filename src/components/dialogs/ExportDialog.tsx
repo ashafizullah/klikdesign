@@ -4,6 +4,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useDesign } from "../../store/design";
 import { notifyError, useUi } from "../../store/ui";
 import { exportDesign, type ExportFormat } from "../../lib/export";
+import { pageCount } from "../../lib/pages";
 import { useT, type Key } from "../../i18n";
 import { Button, Modal } from "../ui";
 
@@ -18,6 +19,8 @@ export function ExportDialog() {
   const t = useT();
   const close = () => useUi.getState().open(null);
   const { width, height } = useDesign((s) => s.design);
+  const pages = useDesign((s) => pageCount(s.design));
+  const [all, setAll] = useState(true);
   const [format, setFormat] = useState<ExportFormat>("png");
   const [scale, setScale] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -28,7 +31,7 @@ export function ExportDialog() {
     try {
       // Deselect first so nothing UI-only is mid-edit while rendering.
       useDesign.getState().select([]);
-      const path = await exportDesign(format, scalable ? scale : 1);
+      const path = await exportDesign(format, scalable ? scale : 1, pages > 1 && all);
       if (!path) return;
       close();
       useUi.getState().notify(t("export.done", { path }));
@@ -71,6 +74,20 @@ export function ExportDialog() {
             </div>
           </div>
         )}
+        {pages > 1 && (
+          <div className="flex rounded-md border border-line p-0.5 text-[11px]">
+            {[true, false].map((v) => (
+              <button
+                key={String(v)}
+                onClick={() => setAll(v)}
+                className={`flex-1 rounded px-2 py-1.5 ${all === v ? "bg-panel-2 text-accent" : "text-muted hover:text-text"}`}
+              >
+                {v ? t("export.allPages", { n: pages }) : t("export.thisPage")}
+              </button>
+            ))}
+          </div>
+        )}
+        {pages > 1 && all && format !== "pdf" && <p className="-mt-2 text-[11px] text-muted">{t("export.numbered")}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={close}>{t("common.cancel")}</Button>
           <Button variant="primary" disabled={busy} onClick={run}>
