@@ -86,6 +86,11 @@ mockIPC(async (cmd, args) => {
       await new Promise((r) => setTimeout(r, 400));
       const last = req.messages?.[req.messages.length - 1];
       const afterTools = last?.content?.some((p: any) => p.type === "toolResult");
+      if (req.tools?.some((t: any) => t.name === "save_brand_kit")) {
+        return { stopReason: "tool_use", message: { role: "assistant", content: [
+          { type: "toolCall", id: `b${chatCalls}`, name: "save_brand_kit", input: { colors: ["#7a3e1d", "#f4e9dc", "#1f1a17"], fonts: ["Playfair Display", "Inter"], logos_from_project: ["public/logo.svg"], voice: "Hangat dan santai. Tagline: Kopi enak, harga teman." } },
+        ] } };
+      }
       const research = req.tools?.some((t: any) => t.name === "place_project_image");
       const done = (n: string) => req.messages.some((m: any) => m.content.some((p: any) => p.type === "toolResult" && p.name === n));
       if (research && !done("read_file")) {

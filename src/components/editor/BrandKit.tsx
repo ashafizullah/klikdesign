@@ -1,17 +1,19 @@
 // Brand kit editor. In the editor, clicking a color, font or logo also applies it.
-import { useEffect, useState } from "react";
-import { ImagePlus, Plus, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { TextEl } from "../../types/design";
 import { saveBrand, useBrandKit, type BrandKit } from "../../store/brand";
 import { useDesign } from "../../store/design";
-import { notifyError } from "../../store/ui";
+import { notifyError, useUi } from "../../store/ui";
+import { aiReady } from "../../store/settings";
+import { detectBrand } from "../../lib/brandDetect";
 import { ensureFont } from "../../lib/fonts";
 import { ipc } from "../../lib/ipc";
 import { IMAGE_EXTS, mediaChanged, placeImage } from "../../lib/media";
 import { TEXT_PRESETS, placeOnPage } from "../../lib/templates";
 import { normalizeElement } from "../../types/design";
-import { useT } from "../../i18n";
+import { useT, type Key } from "../../i18n";
 import { Button } from "../ui";
 import { FontPicker } from "../ui/FontPicker";
 import { useImage } from "../../lib/images";
@@ -61,6 +63,7 @@ export function BrandKitEditor({ workspaceId, apply }: { workspaceId: string; ap
 
   return (
     <div className="space-y-4">
+      <DetectButton workspaceId={workspaceId} />
       {apply && <p className="text-[11px] leading-relaxed text-muted">{t("brand.applyHint")}</p>}
 
       <section>
@@ -137,6 +140,54 @@ export function BrandKitEditor({ workspaceId, apply }: { workspaceId: string; ap
         />
       </section>
       <p className="text-[11px] leading-relaxed text-muted">{t("brand.aiNote")}</p>
+    </div>
+  );
+}
+
+const STEP: Record<string, Key> = {
+  list_files: "brand.stepFiles",
+  read_file: "brand.stepRead",
+  search_code: "brand.stepSearch",
+  list_project_images: "brand.stepLogo",
+  view_project_image: "brand.stepLogo",
+  list_installed_fonts: "brand.stepFonts",
+  save_brand_kit: "brand.stepSave",
+};
+
+/** Lets the app's AI read the project and fill the kit. */
+function DetectButton({ workspaceId }: { workspaceId: string }) {
+  const t = useT();
+  const [ready, setReady] = useState(false);
+  const [step, setStep] = useState<Key | null>(null);
+  const signal = useRef<{ cancelled: boolean } | null>(null);
+  useEffect(() => void aiReady().then(setReady), []);
+  const run = async () => {
+    signal.current = { cancelled: false };
+    setStep("brand.stepStart");
+    try {
+      await detectBrand(workspaceId, { signal: signal.current, onTool: (name) => setStep(STEP[name] ?? "brand.stepStart") });
+      useUi.getState().notify(t("brand.detectDone"));
+    } catch (e) {
+      if (!signal.current?.cancelled) notifyError(e);
+    } finally {
+      setStep(null);
+      signal.current = null;
+    }
+  };
+  if (step)
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-[12px] text-accent">
+        <Loader2 size={13} className="shrink-0 animate-spin" />
+        <span className="min-w-0 flex-1 truncate">{t(step)}</span>
+        <button className="text-[11px] text-muted hover:text-text" onClick={() => signal.current && (signal.current.cancelled = true)}>{t("chat.stop")}</button>
+      </div>
+    );
+  return (
+    <div>
+      <Button variant="primary" className="w-full" disabled={!ready} onClick={() => void run()}>
+        <Sparkles size={13} /> {t("brand.detect")}
+      </Button>
+      <p className="mt-1 text-[11px] leading-relaxed text-muted">{t(ready ? "brand.detectHint" : "resize.aiNoKey")}</p>
     </div>
   );
 }
