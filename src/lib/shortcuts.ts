@@ -1,17 +1,35 @@
 import { useEffect } from "react";
-import type { El } from "../types/design";
+import { listen } from "@tauri-apps/api/event";
 import { redo, undo, useDesign } from "../store/design";
 import { notifyError, useUi } from "../store/ui";
 import { useApp } from "../store/app";
 import { saveNow } from "./library";
+import { copyElements, paste } from "./clipboard";
 
 function typing(e: KeyboardEvent): boolean {
   const el = e.target as HTMLElement | null;
   return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
 }
 
-/** In-app clipboard for copy/paste of elements. */
-let clipboard: El[] = [];
+const TEXT_INPUTS = new Set(["text", "search", "url", "email", "password", ""]);
+
+/** A field with its own text undo (a text box, the chat), as opposed to a number field, slider, checkbox or select. */
+function editingText(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.tagName === "TEXTAREA" || el.isContentEditable) return true;
+  return el instanceof HTMLInputElement && TEXT_INPUTS.has(el.getAttribute("type") ?? "");
+}
+
+/** Undo or redo the design, unless a text field that undoes its own typing has the focus. */
+function undoOrRedo(again: boolean) {
+  const focused = document.activeElement;
+  if (editingText(focused)) return void document.execCommand(again ? "redo" : "undo");
+  if (useApp.getState().view !== "editor" || useUi.getState().dialog) return;
+  // A number field commits its edit on blur, so that edit is what gets undone.
+  if (focused instanceof HTMLElement && focused !== document.body) focused.blur();
+  if (again) redo();
+  else undo();
+}
 
 export function useShortcuts() {
   useEffect(() => {
@@ -28,27 +46,30 @@ export function useShortcuts() {
         useUi.getState().toggleTerminal();
         return;
       }
-      if (typing(e) || useUi.getState().dialog || useUi.getState().editingTextId) return;
-      const store = useDesign.getState();
-      const sel = store.selected;
+      // Undo works from anywhere in the editor except fields that undo their own text.
       const key = e.key.toLowerCase();
-      if (mod && key === "z") {
+      if (mod && (key === "z" || key === "y") && !editingText(e.target) && !useUi.getState().dialog) {
         e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
+        return undoOrRedo(key === "y" || e.shiftKey);
+      }
+      if (typing(e) || useUi.getState().dialog || useUi.getState().editingTextId) return;
+      if (useUi.getState().croppingId) {
+        if (e.key === "Escape" || e.key === "Enter") useUi.getState().setCropping(null);
         return;
       }
-      if (mod && key === "y") return void (e.preventDefault(), redo());
+      const store = useDesign.getState();
+      const sel = store.selected;
       if (mod && key === "a") return void (e.preventDefault(), store.select(store.design.elements.filter((x) => !x.locked && !x.hidden).map((x) => x.id)));
-      if (mod && key === "c" && sel.length) return void (clipboard = structuredClone(store.design.elements.filter((x) => sel.includes(x.id))));
+      if (mod && key === "c" && sel.length) return void copyElements(sel);
       if (mod && key === "x" && sel.length) {
-        clipboard = structuredClone(store.design.elements.filter((x) => sel.includes(x.id)));
+        void copyElements(sel);
         return void store.remove(sel);
       }
-      if (mod && key === "v" && clipboard.length) {
+      if (mod && key === "v") return void (e.preventDefault(), paste().catch(notifyError));
+      if (mod && key === "g") {
         e.preventDefault();
-        store.add(clipboard.map(({ id: _id, ...x }) => ({ ...structuredClone(x), x: x.x + 24, y: x.y + 24, locked: undefined })));
-        clipboard = clipboard.map((x) => ({ ...x, x: x.x + 24, y: x.y + 24 }));
+        if (e.shiftKey) store.ungroup(sel);
+        else if (sel.length > 1) store.group(sel);
         return;
       }
       if (mod && key === "d" && sel.length) return void (e.preventDefault(), store.duplicate(sel));
@@ -88,6 +109,11 @@ export function useShortcuts() {
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // On macOS ⌘Z/⇧⌘Z also arrive from the Edit menu (when the webview passes the key on, or the menu is clicked).
+    const unlisten = listen<string>("menu-edit", (e) => undoOrRedo(e.payload === "redo")).catch(() => () => {});
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      void unlisten.then((fn) => fn());
+    };
   }, []);
 }

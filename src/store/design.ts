@@ -4,6 +4,7 @@ import type { Design, El, NewEl, Page } from "../types/design";
 import { normalizeElement, normalizeFill } from "../types/design";
 import { newId } from "../lib/ids";
 import * as pages from "../lib/pages";
+import * as groups from "../lib/groups";
 
 export function emptyDesign(over: Partial<Design> = {}): Design {
   return { version: 1, id: newId("dsn"), name: "Untitled design", width: 1080, height: 1350, background: "#ffffff", elements: [], ...over };
@@ -74,6 +75,10 @@ interface DesignState {
   remove(ids: string[]): void;
   duplicate(ids: string[]): string[];
   reorder(ids: string[], to: Reorder): void;
+  /** Groups the elements (and the groups they touch); ungroup dissolves their groups. */
+  group(ids: string[]): void;
+  ungroup(ids: string[]): void;
+  renameGroup(groupId: string, name: string): void;
 
   /** Page actions (carousel); each clears the selection. */
   openPage(i: number): void;
@@ -120,16 +125,23 @@ export const useDesign = create<DesignState>()(
 
       remove: (ids) => {
         const set_ = new Set(ids);
-        get().update((d) => void (d.elements = d.elements.filter((e) => !set_.has(e.id))));
+        get().update((d) => void (d.elements = groups.pruneGroups(d.elements.filter((e) => !set_.has(e.id)))));
         set((s) => ({ selected: s.selected.filter((id) => !set_.has(id)) }));
       },
 
       duplicate: (ids) => {
-        const src = get().design.elements.filter((e) => ids.includes(e.id));
-        return get().add(src.map(({ id: _id, ...e }) => ({ ...structuredClone(e), x: e.x + 24, y: e.y + 24 })));
+        const { elements } = get().design;
+        const src = groups.regroup(structuredClone(elements.filter((e) => ids.includes(e.id))), elements);
+        return get().add(src.map(({ id: _id, ...e }) => ({ ...e, x: e.x + 24, y: e.y + 24 })));
       },
 
       reorder: (ids, to) => get().update((d) => void (d.elements = reorder(d.elements, ids, to))),
+      group: (ids) => {
+        get().update((d) => void (d.elements = groups.group(d.elements, ids)));
+        set((s) => ({ selected: groups.withGroups(s.design.elements, ids) }));
+      },
+      ungroup: (ids) => get().update((d) => void (d.elements = groups.ungroup(d.elements, ids))),
+      renameGroup: (groupId, name) => get().update((d) => void (d.elements = groups.renameGroup(d.elements, groupId, name))),
 
       openPage: (i) => set((s) => ((s.design.page ?? 0) === i ? s : { design: pages.goToPage(s.design, i), dirty: true, selected: [] })),
       addPage: (copy) => set((s) => ({ design: pages.addPage(s.design, copy), dirty: true, selected: [] })),

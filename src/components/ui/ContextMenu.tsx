@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
-export type MenuItem = { icon: LucideIcon; label: string; run(): void; danger?: boolean; disabled?: boolean } | "sep";
+export type MenuItem = { icon: LucideIcon; label: string; run(): void; danger?: boolean; disabled?: boolean; hint?: string } | "sep";
 export type MenuState = { x: number; y: number; title?: string; items: MenuItem[] } | null;
 
 export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () => void }) {
@@ -57,7 +57,8 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
             }}
             className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] disabled:opacity-35 ${item.danger ? "text-danger hover:bg-danger/10" : "hover:bg-panel-2"}`}
           >
-            <item.icon size={13} className="shrink-0" /> {item.label}
+            <item.icon size={13} className="shrink-0" /> <span className="flex-1">{item.label}</span>
+            {item.hint && <span className="pl-4 text-[11px] text-muted">{item.hint}</span>}
           </button>
         ),
       )}

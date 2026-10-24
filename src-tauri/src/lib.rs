@@ -1,10 +1,12 @@
 mod ai;
+mod clipboard;
 mod commands;
 mod error;
 mod fonts;
 mod keys;
 mod library;
 mod mcp;
+mod menu;
 mod terminal;
 mod workspace;
 
@@ -17,13 +19,23 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(terminal::Terminals::default())
+        .manage(clipboard::Clipboard::default())
         .setup(|app| {
             use tauri::Manager;
             let dir = app.path().app_data_dir()?;
             keys::init(dir.clone());
             app.manage(mcp::Mcp::new(dir.clone()));
             app.manage(library::Library::new(dir));
+            #[cfg(target_os = "macos")]
+            app.set_menu(menu::app_menu(app.handle())?)?;
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            use tauri::Emitter;
+            let id = event.id().as_ref();
+            if id == menu::UNDO || id == menu::REDO {
+                let _ = app.emit("menu-edit", id);
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::api_keys_status,
@@ -42,6 +54,8 @@ pub fn run() {
             commands::brand_set,
             commands::brand_logo_import,
             commands::media_bytes,
+            commands::clipboard_read,
+            commands::clipboard_write,
             commands::workspaces_list,
             commands::workspace_add,
             commands::workspace_rename,

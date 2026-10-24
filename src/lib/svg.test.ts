@@ -34,3 +34,11 @@ test("serializes page, shapes, text and images", () => {
 test("images without data are skipped", () => {
   expect(designToSvg(design, { lines: {}, images: {} })).not.toContain("<image");
 });
+
+test("a cropped image exports as a viewBox onto the whole image", () => {
+  const d = normalizeDesign({ elements: [{ id: "i", type: "image", src: "/m/b.png", x: 0, y: 0, w: 100, h: 100, crop: { x: 0, y: 0.5, zoom: 2 } }] as never });
+  const svg = designToSvg(d, { lines: {}, images: { "/m/b.png": "data:x" }, sizes: { "/m/b.png": { w: 400, h: 200 } } });
+  // Cover scale 0.5, zoomed to 1: a 100×100 window at the left edge, centered vertically.
+  expect(svg).toContain('viewBox="0 50 100 100"');
+  expect(svg).toContain('<image href="data:x" width="400" height="200"/>');
+});

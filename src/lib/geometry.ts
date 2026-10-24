@@ -1,5 +1,5 @@
 // Pure geometry shared by the canvas, snapping and SVG export.
-import type { El, LinearGradient } from "../types/design";
+import type { Crop, El, LinearGradient } from "../types/design";
 
 /** Gradient line endpoints for a w×h box, CSS-like: 0° runs left → right, 90° top → bottom. */
 export function gradientPoints(g: LinearGradient, w: number, h: number) {
@@ -85,3 +85,15 @@ export function polygonPoints(shape: "triangle" | "star", w: number, h: number):
 
 /** Text height for `lines` lines, as the canvas lays it out. */
 export const textHeight = (lines: number, fontSize: number, lineHeight: number) => Math.max(1, lines) * fontSize * lineHeight;
+
+/**
+ * Source rectangle of an iw×ih image shown in a w×h box: it covers the box
+ * without stretching (object-fit: cover), zoomed and positioned by `crop`.
+ * `scale` is box pixels per image pixel.
+ */
+export function imageCrop(iw: number, ih: number, w: number, h: number, crop?: Crop) {
+  const scale = Math.max(w / iw, h / ih) * (crop?.zoom ?? 1);
+  const cw = w / scale;
+  const ch = h / scale;
+  return { x: (iw - cw) * (crop?.x ?? 0.5), y: (ih - ch) * (crop?.y ?? 0.5), width: cw, height: ch, scale };
+}

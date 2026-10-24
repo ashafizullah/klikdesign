@@ -29,6 +29,10 @@ interface Base {
   locked?: boolean;
   hidden?: boolean;
   shadow?: Shadow | null;
+  /** Elements sharing a group id select, move and arrange as one. */
+  groupId?: string;
+  /** The group's name, kept on each of its members. */
+  groupName?: string;
 }
 
 export interface TextEl extends Base {
@@ -59,11 +63,19 @@ export interface ShapeEl extends Base {
   cornerRadius?: number;
 }
 
+/** How an image fills its box: it always covers it, `zoom` times closer, with the visible part at `x`/`y` (0…1, 0.5 = centered). */
+export interface Crop {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 export interface ImageEl extends Base {
   type: "image";
   /** Path of the image inside the design's media folder. */
   src: string;
   cornerRadius?: number;
+  crop?: Crop;
 }
 
 export type El = TextEl | ShapeEl | ImageEl;
@@ -150,6 +162,13 @@ function normalizeShadow(v: unknown): Shadow | null {
   return { color: color(s.color, "rgba(0,0,0,0.35)"), blur: clamp(num(s.blur, 12), 0, 200), offsetX: num(s.offsetX, 0), offsetY: num(s.offsetY, 4) };
 }
 
+function normalizeCrop(v: unknown): Crop | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const c = v as Partial<Crop>;
+  const crop = { x: clamp(num(c.x, 0.5), 0, 1), y: clamp(num(c.y, 0.5), 0, 1), zoom: clamp(num(c.zoom, 1), 1, 10) };
+  return crop.x === 0.5 && crop.y === 0.5 && crop.zoom === 1 ? undefined : crop;
+}
+
 /**
  * Fills defaults and drops invalid values. Used for stored designs, templates
  * and everything the AI writes, so the canvas never sees a malformed element.
@@ -167,6 +186,8 @@ export function normalizeElement(raw: Record<string, unknown>, id: string): El |
     locked: raw.locked === true || undefined,
     hidden: raw.hidden === true || undefined,
     shadow: normalizeShadow(raw.shadow),
+    groupId: typeof raw.groupId === "string" && raw.groupId ? raw.groupId : undefined,
+    groupName: typeof raw.groupId === "string" && raw.groupId && typeof raw.groupName === "string" && raw.groupName.trim() ? raw.groupName.trim().slice(0, 60) : undefined,
   };
   switch (raw.type) {
     case "text":
@@ -201,7 +222,7 @@ export function normalizeElement(raw: Record<string, unknown>, id: string): El |
     }
     case "image":
       if (typeof raw.src !== "string" || !raw.src) return null;
-      return { ...base, type: "image", src: raw.src, cornerRadius: clamp(num(raw.cornerRadius, 0), 0, 2000) || undefined };
+      return { ...base, type: "image", src: raw.src, cornerRadius: clamp(num(raw.cornerRadius, 0), 0, 2000) || undefined, crop: normalizeCrop(raw.crop) };
     default:
       return null;
   }

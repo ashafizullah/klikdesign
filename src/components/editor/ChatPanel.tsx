@@ -29,6 +29,8 @@ const TOOL_LABELS: Record<string, Key> = {
   update_elements: "tool.update_elements",
   remove_elements: "tool.remove_elements",
   reorder: "tool.reorder",
+  group_elements: "tool.group_elements",
+  ungroup_elements: "tool.ungroup_elements",
   view_design: "tool.view_design",
   list_files: "tool.list_files",
   read_file: "tool.read_file",

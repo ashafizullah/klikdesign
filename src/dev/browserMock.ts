@@ -6,6 +6,9 @@ const designs = new Map<string, string>();
 const media = new Map<string, Uint8Array>();
 let chatCalls = 0;
 const brands = new Map<string, string>();
+/** Stand-in for the system clipboard (set from the console with `__mockClipboard("[image]")`). */
+let systemClipboard = "";
+(window as unknown as { __mockClipboard(t: string): void }).__mockClipboard = (t) => void (systemClipboard = t);
 const workspaces = [{ id: "ws_demo", name: "kopi-senja-app", path: "/Users/dev/Projects/kopi-senja-app", createdAt: Date.now() }];
 
 const demoSvg = (hue: number) =>
@@ -42,6 +45,18 @@ mockIPC(async (cmd, args) => {
       const path = `/mock/${a.id}/media/${media.size}.svg`;
       media.set(path, demoSvg(media.size * 70));
       return path;
+    }
+    case "clipboard_write":
+      systemClipboard = a.text;
+      return null;
+    case "clipboard_read": {
+      // "[image]" on the mock clipboard stands for a copied screenshot.
+      if (systemClipboard === "[image]") {
+        const path = `/mock/${a.id}/media/${media.size}.svg`;
+        media.set(path, demoSvg(media.size * 70));
+        return { kind: "image", path };
+      }
+      return systemClipboard ? { kind: "text", text: systemClipboard } : { kind: "empty" };
     }
     case "media_list":
       return [...media.keys()].filter((k) => k.startsWith(`/mock/${a.id}/`)).reverse();

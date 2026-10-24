@@ -43,8 +43,9 @@ The page is ${width}×${height} px. Coordinates are page pixels from the top-lef
 Element types:
 - text: text, fontFamily, fontSize (px), fontWeight (100–900), italic, fill, align (left|center|right), lineHeight (multiplier), letterSpacing (px), uppercase, stroke, strokeWidth. Text wraps inside w; its height follows the content (get_design reports the measured h).
 - shape: shape (rect|ellipse|triangle|star|line), fill, stroke, strokeWidth, cornerRadius (rect only). A line is drawn horizontally through the middle of its box using stroke/strokeWidth.
-- image: pictures. You cannot generate images, but you may move, resize, layer or round them (cornerRadius)${project ? ", and place images from the project folder with place_project_image" : ""}.
+- image: pictures. You cannot generate images, but you may move, resize, layer, round (cornerRadius) or crop them${project ? ", and place images from the project folder with place_project_image" : ""}. An image always covers its box without stretching; crop {x, y, zoom} zooms in (1–10) and picks the visible part (x/y 0–1, 0.5 = centered; e.g. y 0.2 keeps a face near the top).
 Any element also takes opacity (0–1), name, and shadow {color, blur, offsetX, offsetY}.
+Elements with the same groupId form a group the user selects and moves as one; group parts that belong together (a button and its label, a badge) with group_elements.
 A design can have several pages (a carousel or slide set); the tools act on the open page (get_design says which). For a carousel, finish page 1, then add_page for each next slide (copy_current: true to keep the layout and change the copy), keeping one visual system across slides.
 A fill is a CSS color ("#0f172a", "rgba(0,0,0,0.5)") or a linear gradient {"kind":"linear","angle":deg,"colors":["#…","#…"]} (0° = left→right, 90° = top→bottom).
 
@@ -107,6 +108,7 @@ const element = {
     shape: { type: "string", enum: ["rect", "ellipse", "triangle", "star", "line"] }, cornerRadius: num,
     fill, stroke: str, strokeWidth: num,
     shadow: obj({ color: str, blur: num, offsetX: num, offsetY: num }),
+    crop: { ...obj({ x: num, y: num, zoom: num }), description: "Images only (update_elements)" },
   },
   required: ["type", "x", "y", "w"],
 };
@@ -136,6 +138,8 @@ export function tools(vision: boolean, project: boolean): ToolDef[] {
       description: "Moves elements in the stack.",
       parameters: obj({ ids: { type: "array", items: str }, to: { type: "string", enum: ["front", "back", "forward", "backward"] } }, ["ids", "to"]),
     },
+    { name: "group_elements", description: "Groups elements (at least two) so they select and move as one, with an optional name shown in the Layers panel. Returns the group id.", parameters: obj({ ids: { type: "array", items: str }, name: str }, ["ids"]) },
+    { name: "ungroup_elements", description: "Dissolves the groups the given elements belong to.", parameters: obj({ ids: { type: "array", items: str } }, ["ids"]) },
   ];
   list.push(
     { name: "rename_design", description: "Renames the open design (its title in the library).", parameters: obj({ name: str }, ["name"]) },
@@ -215,15 +219,15 @@ export function describe(): unknown {
     height: design.height,
     background: design.background,
     elements: design.elements.map((e) => {
-      const { id, type, x, y, w, rotation, opacity, name, locked, hidden, shadow } = e;
+      const { id, type, x, y, w, rotation, opacity, name, locked, hidden, shadow, groupId, groupName } = e;
       const h = e.type === "text" ? textHeight(lines[e.id]?.length ?? e.text.split("\n").length, e.fontSize, e.lineHeight) : e.h;
-      const common = { id, type, name, x: r(x), y: r(y), w: r(w), h: r(h), rotation: rotation || undefined, opacity: opacity < 1 ? opacity : undefined, locked, hidden, shadow: shadow ?? undefined };
+      const common = { id, type, name, x: r(x), y: r(y), w: r(w), h: r(h), rotation: rotation || undefined, opacity: opacity < 1 ? opacity : undefined, locked, hidden, shadow: shadow ?? undefined, groupId, groupName };
       if (e.type === "text") {
         const { text, fontFamily, fontSize, fontWeight, italic, fill, align, lineHeight, letterSpacing, uppercase, stroke, strokeWidth } = e;
         return { ...common, text, fontFamily, fontSize, fontWeight, italic, fill, align, lineHeight, letterSpacing, uppercase, stroke, strokeWidth };
       }
       if (e.type === "shape") return { ...common, shape: e.shape, fill: e.fill, stroke: e.stroke, strokeWidth: e.strokeWidth, cornerRadius: e.cornerRadius };
-      return { ...common, cornerRadius: e.cornerRadius };
+      return { ...common, cornerRadius: e.cornerRadius, crop: e.crop };
     }),
   };
 }
@@ -327,6 +331,17 @@ export async function exec(name: string, a: ToolArgs): Promise<unknown> {
       return { ok: true };
     case "reorder":
       store.reorder(ids(a.ids), (["front", "back", "forward", "backward"].includes(String(a.to)) ? a.to : "front") as Reorder);
+      return { ok: true };
+    case "group_elements": {
+      const found = ids(a.ids).filter((id) => store.design.elements.some((e) => e.id === id));
+      if (found.length < 2) throw new Error("group_elements needs at least two existing element ids");
+      store.group(found);
+      const groupId = useDesign.getState().design.elements.find((e) => e.id === found[0])?.groupId;
+      if (groupId && typeof a.name === "string") useDesign.getState().renameGroup(groupId, a.name);
+      return { groupId };
+    }
+    case "ungroup_elements":
+      store.ungroup(ids(a.ids));
       return { ok: true };
     case "view_design": {
       const { width, height } = store.design;

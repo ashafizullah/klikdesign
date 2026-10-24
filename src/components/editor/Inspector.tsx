@@ -1,7 +1,8 @@
 // Properties of the selection, or of the page when nothing is selected.
 import {
   AlignCenter, AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignLeft, AlignRight,
-  AlignStartHorizontal, AlignStartVertical, ArrowDownToLine, ArrowUpToLine, Bold, CaseUpper, ChevronDown, ChevronUp, Copy, Italic, Lock, Trash2, Unlock,
+  AlignHorizontalSpaceAround, AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, ArrowDownToLine, ArrowUpToLine, Bold, CaseUpper,
+  ChevronDown, ChevronUp, Copy, Crop, Group, Italic, Lock, RotateCcw, Trash2, Ungroup, Unlock,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { El, Fill, ImageEl, ShapeEl, Shadow, TextEl } from "../../types/design";
@@ -12,9 +13,12 @@ import { ensureFont, fontInfo, nearestWeight } from "../../lib/fonts";
 import { FontPicker } from "../ui/FontPicker";
 import { useBrandKit } from "../../store/brand";
 import { bounds, textHeight } from "../../lib/geometry";
+import { alignOffset, distributeOffsets, union, type AlignMode } from "../../lib/arrange";
+import { isOneGroup, units } from "../../lib/groups";
+import { shortcut } from "../../lib/platform";
 import { textLines } from "../../lib/stage";
 import { useT } from "../../i18n";
-import { IconButton, NumberField, Section, Slider } from "../ui";
+import { Button, IconButton, NumberField, Section, Slider } from "../ui";
 
 export function Inspector() {
   const t = useT();
@@ -78,30 +82,34 @@ function Arrange({ sel }: { sel: El[] }) {
   const store = useDesign.getState();
   const ids = sel.map((e) => e.id);
   const locked = sel.every((e) => e.locked);
-  const align = (mode: "l" | "c" | "r" | "t" | "m" | "b") => {
-    const { design } = useDesign.getState();
+  const elements = useDesign((s) => s.design.elements);
+  const oneGroup = isOneGroup(elements, ids);
+  const grouped = sel.some((e) => e.groupId);
+  const unitCount = units(elements, ids).length;
+
+  /** Each group and each ungrouped element of the selection, with its bounds. */
+  const measure = () => {
     const lines = textLines();
     // Text boxes use the measured height; the stored one is not kept up to date.
-    const boxes = sel.map((e) => ({ e, b: bounds(e.type === "text" ? { ...e, h: textHeight(lines[e.id]?.length ?? 1, e.fontSize, e.lineHeight) } : e) }));
-    // One element aligns to the page; several align to their shared bounds.
-    const area =
-      sel.length === 1
-        ? { x: 0, y: 0, w: design.width, h: design.height }
-        : (() => {
-            const x = Math.min(...boxes.map(({ b }) => b.x));
-            const y = Math.min(...boxes.map(({ b }) => b.y));
-            return { x, y, w: Math.max(...boxes.map(({ b }) => b.x + b.w)) - x, h: Math.max(...boxes.map(({ b }) => b.y + b.h)) - y };
-          })();
-    useDesign.getState().patchMany(
-      boxes.map(({ e, b }) => {
-        const dx = mode === "l" ? area.x - b.x : mode === "c" ? area.x + area.w / 2 - (b.x + b.w / 2) : mode === "r" ? area.x + area.w - (b.x + b.w) : 0;
-        const dy = mode === "t" ? area.y - b.y : mode === "m" ? area.y + area.h / 2 - (b.y + b.h / 2) : mode === "b" ? area.y + area.h - (b.y + b.h) : 0;
-        return { id: e.id, patch: { x: e.x + dx, y: e.y + dy } };
-      }),
-    );
+    const box = (e: El) => bounds(e.type === "text" ? { ...e, h: textHeight(lines[e.id]?.length ?? 1, e.fontSize, e.lineHeight) } : e);
+    return units(useDesign.getState().design.elements, ids).map((u) => ({ u, b: union(u.map(box)) }));
+  };
+  const move = (moves: { u: El[]; dx: number; dy: number }[]) =>
+    store.patchMany(moves.flatMap(({ u, dx, dy }) => u.filter((e) => !e.locked).map((e) => ({ id: e.id, patch: { x: e.x + dx, y: e.y + dy } }))));
+  const align = (mode: AlignMode) => {
+    const { design } = useDesign.getState();
+    const boxes = measure();
+    // One element or group aligns to the page; several align to their shared bounds.
+    const area = boxes.length === 1 ? { x: 0, y: 0, w: design.width, h: design.height } : union(boxes.map(({ b }) => b));
+    move(boxes.map(({ u, b }) => ({ u, ...alignOffset(b, area, mode) })));
+  };
+  const distribute = (axis: "x" | "y") => {
+    const boxes = measure();
+    const offsets = distributeOffsets(boxes.map(({ b }) => b), axis);
+    move(boxes.map(({ u }, i) => ({ u, ...offsets[i] })));
   };
   return (
-    <Section title={sel.length > 1 ? t("insp.selected", { n: sel.length }) : t(`type.${sel[0].type}`)}>
+    <Section title={oneGroup ? `${sel[0].groupName || t("layers.group")} · ${t("insp.groupCount", { n: sel.length })}` : sel.length > 1 ? t("insp.selected", { n: sel.length }) : t(`type.${sel[0].type}`)}>
       <div className="flex flex-wrap gap-0.5">
         <IconButton title={t("insp.alignLeft")} onClick={() => align("l")}><AlignStartVertical size={15} /></IconButton>
         <IconButton title={t("insp.alignCenter")} onClick={() => align("c")}><AlignCenterVertical size={15} /></IconButton>
@@ -109,7 +117,28 @@ function Arrange({ sel }: { sel: El[] }) {
         <IconButton title={t("insp.alignTop")} onClick={() => align("t")}><AlignStartHorizontal size={15} /></IconButton>
         <IconButton title={t("insp.alignMiddle")} onClick={() => align("m")}><AlignCenterHorizontal size={15} /></IconButton>
         <IconButton title={t("insp.alignBottom")} onClick={() => align("b")}><AlignEndHorizontal size={15} /></IconButton>
+        {sel.length > 1 && (
+          <>
+            <div className="mx-0.5 w-px bg-line" />
+            <IconButton title={t("insp.distributeH")} disabled={unitCount < 3} onClick={() => distribute("x")}><AlignHorizontalSpaceAround size={15} /></IconButton>
+            <IconButton title={t("insp.distributeV")} disabled={unitCount < 3} onClick={() => distribute("y")}><AlignVerticalSpaceAround size={15} /></IconButton>
+          </>
+        )}
       </div>
+      {(grouped || sel.length > 1) && (
+        <div className="flex gap-1.5">
+          {sel.length > 1 && !oneGroup && (
+            <Button className="flex-1" onClick={() => store.group(ids)} title={`${t("insp.groupAction")} (${shortcut("G")})`}>
+              <Group size={14} /> {t("insp.groupAction")}
+            </Button>
+          )}
+          {grouped && (
+            <Button className="flex-1" onClick={() => store.ungroup(ids)} title={`${t("insp.ungroup")} (${shortcut("G", true)})`}>
+              <Ungroup size={14} /> {t("insp.ungroup")}
+            </Button>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap gap-0.5">
         <IconButton title={t("insp.toFront")} onClick={() => store.reorder(ids, "front")}><ArrowUpToLine size={15} /></IconButton>
         <IconButton title={t("insp.forward")} onClick={() => store.reorder(ids, "forward")}><ChevronUp size={15} /></IconButton>
@@ -202,8 +231,17 @@ function ShapeProps({ el }: { el: ShapeEl }) {
 
 function ImageProps({ el }: { el: ImageEl }) {
   const t = useT();
+  const cropping = useUi((s) => s.croppingId === el.id);
+  const crop = el.crop ?? { x: 0.5, y: 0.5, zoom: 1 };
   return (
     <Section title={t("type.image")}>
+      <div className="flex gap-1.5">
+        <Button className="flex-1" variant={cropping ? "primary" : "subtle"} disabled={el.locked} onClick={() => useUi.getState().setCropping(cropping ? null : el.id)} title={t("crop.title")}>
+          <Crop size={14} /> {t(cropping ? "crop.done" : "crop.action")}
+        </Button>
+        <IconButton title={t("crop.reset")} disabled={!el.crop} onClick={() => patch(el.id, { crop: undefined })}><RotateCcw size={15} /></IconButton>
+      </div>
+      <Slider label={t("crop.zoom")} min={1} max={5} step={0.01} value={crop.zoom} format={(v) => `${Math.round(v * 100)}%`} onChange={(zoom) => patch(el.id, { crop: { ...crop, zoom } })} />
       <Slider label={t("insp.radius")} min={0} max={Math.min(el.w, el.h) / 2} step={1} value={el.cornerRadius ?? 0} format={(v) => `${Math.round(v)}px`} onChange={(cornerRadius) => patch(el.id, { cornerRadius: cornerRadius || undefined })} />
     </Section>
   );

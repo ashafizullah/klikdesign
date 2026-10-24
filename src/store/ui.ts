@@ -18,6 +18,9 @@ interface UiState {
   /** Element whose text is being edited in place. */
   editingTextId: string | null;
   setEditingText(id: string | null): void;
+  /** Image whose crop is being adjusted on the canvas. */
+  croppingId: string | null;
+  setCropping(id: string | null): void;
   dialog: null | "settings" | "export" | "resize";
   /** In-app terminal panel visibility. */
   terminal: boolean;
@@ -50,6 +53,8 @@ export const useUi = create<UiState>()((set) => ({
   setFitZoom: (fitZoom) => set({ fitZoom }),
   editingTextId: null,
   setEditingText: (editingTextId) => set({ editingTextId }),
+  croppingId: null,
+  setCropping: (croppingId) => set({ croppingId }),
   dialog: null,
   terminal: false,
   toggleTerminal: () => set((s) => ({ terminal: !s.terminal })),

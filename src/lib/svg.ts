@@ -3,13 +3,15 @@
 import type { Design, El, Fill, Shadow } from "../types/design";
 import { isGradient } from "../types/design";
 import { cssUrl, googleFont } from "./fonts";
-import { gradientPoints, polygonPoints, textHeight } from "./geometry";
+import { gradientPoints, imageCrop, polygonPoints, textHeight } from "./geometry";
 
 export interface SvgInputs {
   /** Wrapped lines per text element id. */
   lines: Record<string, string[]>;
   /** Data URI per image `src`. */
   images: Record<string, string>;
+  /** Natural size per image `src`, needed to export a crop. */
+  sizes?: Record<string, { w: number; h: number }>;
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -60,6 +62,13 @@ export function designToSvg(d: Design, inputs: SvgInputs): string {
           const id = uid("c");
           defs.push(`<clipPath id="${id}"><rect width="${n(e.w)}" height="${n(e.h)}" rx="${n(e.cornerRadius)}"/></clipPath>`);
           clip = ` clip-path="url(#${id})"`;
+        }
+        const size = inputs.sizes?.[e.src];
+        if (e.crop && size) {
+          // The crop as a viewBox onto the whole image, which the nested svg clips to the box.
+          const c = imageCrop(size.w, size.h, e.w, e.h, e.crop);
+          const view = `<svg width="${n(e.w)}" height="${n(e.h)}" viewBox="${n(c.x)} ${n(c.y)} ${n(c.width)} ${n(c.height)}" preserveAspectRatio="none"><image href="${href}" width="${size.w}" height="${size.h}"/></svg>`;
+          return clip ? `<g${clip}>${view}</g>` : view;
         }
         return `<image href="${href}" width="${n(e.w)}" height="${n(e.h)}" preserveAspectRatio="xMidYMid slice"${clip}/>`;
       }

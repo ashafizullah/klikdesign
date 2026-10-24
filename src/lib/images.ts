@@ -61,14 +61,6 @@ export async function imageDataUri(path: string): Promise<string> {
   });
 }
 
-/** Source rectangle that fills a w×h box without stretching (object-fit: cover). */
-export function coverCrop(iw: number, ih: number, w: number, h: number) {
-  const scale = Math.max(w / iw, h / ih);
-  const cw = w / scale;
-  const ch = h / scale;
-  return { x: (iw - cw) / 2, y: (ih - ch) / 2, width: cw, height: ch };
-}
-
 /** The image downscaled to `max` px as base64 JPEG (for showing it to a vision model). */
 export function jpegBase64(img: HTMLImageElement, max = 1024): string {
   const k = Math.min(1, max / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));

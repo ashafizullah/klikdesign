@@ -5,8 +5,8 @@ import type Konva from "konva";
 import { Ellipse, Group, Image as KImage, Line, Rect, Text } from "react-konva";
 import type { El, Fill, ImageEl, Shadow, TextEl } from "../../types/design";
 import { isGradient } from "../../types/design";
-import { colorStops, gradientPoints, polygonPoints } from "../../lib/geometry";
-import { coverCrop, useImage } from "../../lib/images";
+import { colorStops, gradientPoints, imageCrop, polygonPoints } from "../../lib/geometry";
+import { useImage } from "../../lib/images";
 import { useFonts } from "../../lib/fonts";
 
 /** Konva fill props for a solid color or a linear gradient over a w×h box. */
@@ -57,12 +57,13 @@ function TextShape({ el, editing }: { el: TextEl; editing: boolean }) {
 function ImageShape({ el }: { el: ImageEl }) {
   const img = useImage(el.src);
   if (!img) return <Rect width={el.w} height={el.h} fill="#e5e7eb" cornerRadius={el.cornerRadius} />;
+  const { x, y, width, height } = imageCrop(img.naturalWidth, img.naturalHeight, el.w, el.h, el.crop);
   return (
     <KImage
       image={img}
       width={el.w}
       height={el.h}
-      crop={coverCrop(img.naturalWidth, img.naturalHeight, el.w, el.h)}
+      crop={{ x, y, width, height }}
       cornerRadius={el.cornerRadius}
       {...shadowProps(el.shadow)}
     />

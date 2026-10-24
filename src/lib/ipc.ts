@@ -58,6 +58,12 @@ export interface Workspace {
 
 export type TerminalEvent = { type: "data"; data: string } | { type: "exit"; code: number | null };
 
+export type Pasted =
+  | { kind: "files"; paths: string[] }
+  | { kind: "image"; path: string }
+  | { kind: "text"; text: string }
+  | { kind: "empty" };
+
 export const ipc = {
   apiKeysStatus: (profileIds: string[]) => invoke<Record<string, boolean>>("api_keys_status", { profileIds }),
   apiKeySet: (profileId: string, key: string) => invoke<void>("api_key_set", { profileId, key }),
@@ -78,6 +84,9 @@ export const ipc = {
   mediaImport: (id: string, path: string) => invoke<string>("media_import", { id, path }),
   mediaList: (id: string) => invoke<string[]>("media_list", { id }),
   mediaBytes: (path: string) => invoke<ArrayBuffer>("media_bytes", { path }),
+  /** The system clipboard; a copied image is stored in design `id`'s media folder. */
+  clipboardRead: (id: string) => invoke<Pasted>("clipboard_read", { id }),
+  clipboardWrite: (text: string) => invoke<void>("clipboard_write", { text }),
 
   workspaces: () => invoke<Workspace[]>("workspaces_list"),
   workspaceAdd: (path: string, name?: string) => invoke<Workspace>("workspace_add", { path, name }),

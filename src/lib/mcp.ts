@@ -32,7 +32,7 @@ Workflow:
 1. If no design is open, or the user means another one, use list_designs, then open_design or create_design. The workspace whose path matches your working directory is usually the right one.
 2. Call get_design_guide once: it has the page size, the element model, the fonts you may use and the design rules. Follow it.
 3. get_design before editing; never invent element ids.
-4. Build or revise with set_canvas, add_elements, update_elements, remove_elements and reorder. Place pictures with place_design_image (images the user already added to this design; see list_design_images), place_image (any file on this computer) or place_project_image (from the linked project folder).
+4. Build or revise with set_canvas, add_elements, update_elements, remove_elements and reorder; group parts that belong together with group_elements. Place pictures with place_design_image (images the user already added to this design; see list_design_images), place_image (any file on this computer) or place_project_image (from the linked project folder).
 5. view_design after a build or larger change, and fix overlaps, cut-off text, poor contrast or awkward spacing.
 6. To adapt a design to another format (post to story, banner…), call resize_design (copy: true keeps the original and opens the copy), then re-lay it out with update_elements and check it with view_design.
 7. Give an untitled design a short title with rename_design.

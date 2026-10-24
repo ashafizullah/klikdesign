@@ -32,7 +32,7 @@ pub struct DesignMeta {
     pub workspace_id: Option<String>,
 }
 
-const IMAGE_EXTS: [&str; 6] = ["png", "jpg", "jpeg", "webp", "gif", "svg"];
+pub const IMAGE_EXTS: [&str; 6] = ["png", "jpg", "jpeg", "webp", "gif", "svg"];
 
 /// Total size of all files under `dir`.
 pub fn dir_size(dir: &Path) -> u64 {
@@ -246,6 +246,13 @@ impl Library {
         }
         let out = self.new_media_path(id, &ext)?;
         std::fs::copy(src, &out)?;
+        Ok(out.to_string_lossy().into_owned())
+    }
+
+    /// Writes encoded image bytes (a pasted image) into a design's media folder.
+    pub fn store_media(&self, id: &str, ext: &str, bytes: &[u8]) -> AppResult<String> {
+        let out = self.new_media_path(id, ext)?;
+        std::fs::write(&out, bytes)?;
         Ok(out.to_string_lossy().into_owned())
     }
 

@@ -25,8 +25,14 @@ async function buildPage(format: ExportFormat, scale: number): Promise<Uint8Arra
       return pdfOf([renderPage(scale)]);
     case "svg": {
       const images: Record<string, string> = {};
-      for (const e of d.elements) if (e.type === "image" && !images[e.src]) images[e.src] = await imageDataUri(e.src);
-      return new TextEncoder().encode(designToSvg(d, { lines: textLines(), images }));
+      const sizes: Record<string, { w: number; h: number }> = {};
+      for (const e of d.elements) {
+        if (e.type !== "image" || images[e.src]) continue;
+        images[e.src] = await imageDataUri(e.src);
+        const img = await loadImage(e.src);
+        sizes[e.src] = { w: img.naturalWidth, h: img.naturalHeight };
+      }
+      return new TextEncoder().encode(designToSvg(d, { lines: textLines(), images, sizes }));
     }
   }
 }

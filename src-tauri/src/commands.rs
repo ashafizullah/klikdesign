@@ -1,5 +1,6 @@
 //! Tauri command surface exposed to the webview.
 use crate::ai::{self, ChatRequest, ChatResult, ModelsRequest};
+use crate::clipboard::{Clip, Clipboard};
 use crate::error::{AppError, AppResult};
 use crate::library::{DesignMeta, Library, Workspace};
 use crate::{keys, workspace};
@@ -94,6 +95,45 @@ pub async fn media_bytes(path: String) -> AppResult<tauri::ipc::Response> {
         return Err(AppError::msg("File is too large to load into memory"));
     }
     Ok(tauri::ipc::Response::new(tokio::fs::read(&path).await?))
+}
+
+// ---- clipboard ------------------------------------------------------------
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Pasted {
+    /// Image files to import.
+    Files {
+        paths: Vec<String>,
+    },
+    /// A copied image, already stored in the design's media folder.
+    Image {
+        path: String,
+    },
+    Text {
+        text: String,
+    },
+    Empty,
+}
+
+/// What the system clipboard holds, for pasting into design `id`.
+#[tauri::command]
+pub async fn clipboard_read(id: String, app: tauri::AppHandle) -> AppResult<Pasted> {
+    use tauri::Manager;
+    let handle = app.clone();
+    let clip =
+        tokio::task::spawn_blocking(move || handle.state::<Clipboard>().read()).await.map_err(|e| AppError::msg(e.to_string()))??;
+    Ok(match clip {
+        Clip::Files { paths } => Pasted::Files { paths },
+        Clip::Image(png) => Pasted::Image { path: app.state::<Library>().store_media(&id, "png", &png)? },
+        Clip::Text { text } => Pasted::Text { text },
+        Clip::Empty => Pasted::Empty,
+    })
+}
+
+#[tauri::command]
+pub fn clipboard_write(text: String, clipboard: State<'_, Clipboard>) -> AppResult<()> {
+    clipboard.write_text(&text)
 }
 
 // ---- project folders (read-only, sandboxed) ----------------------------------

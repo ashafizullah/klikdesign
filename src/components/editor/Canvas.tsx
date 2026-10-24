@@ -3,16 +3,20 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type Konva from "konva";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { Group, Layer, Line, Rect, Stage, Transformer } from "react-konva";
+import { Group, Image as KImage, Layer, Line, Rect, Stage, Transformer } from "react-konva";
 import { useShallow } from "zustand/react/shallow";
-import type { El, TextEl } from "../../types/design";
+import type { Crop, El, ImageEl, TextEl } from "../../types/design";
 import { useDesign } from "../../store/design";
 import { notifyError, useUi } from "../../store/ui";
-import { bounds, snap, type Box, type Guide } from "../../lib/geometry";
+import { bounds, imageCrop, snap, type Box, type Guide } from "../../lib/geometry";
 import { registerStage } from "../../lib/stage";
 import { importImages, isImagePath } from "../../lib/media";
+import { withGroups } from "../../lib/groups";
+import { useImage } from "../../lib/images";
 import { ElementNode, fillProps, type NodeHandlers } from "./ElementNode";
 import { TextToolbar } from "./TextToolbar";
+import { CropToolbar } from "./CropToolbar";
+import { ElementMenu, openElementMenu } from "./ElementMenu";
 
 const PAD = 48;
 
@@ -44,6 +48,7 @@ export function Canvas() {
   const selected = useDesign(useShallow((s) => s.selected));
   const zoomSetting = useUi((s) => s.zoom);
   const editingId = useUi((s) => s.editingTextId);
+  const croppingId = useUi((s) => s.croppingId);
 
   useLayoutEffect(() => {
     const el = wrap.current!;
@@ -108,12 +113,12 @@ export function Canvas() {
     const stage = stageRef.current;
     if (!tr || !stage) return;
     const nodes = selected
-      .filter((id) => id !== editingId)
+      .filter((id) => id !== editingId && id !== croppingId)
       .map((id) => stage.findOne<Konva.Group>(`#${id}`))
       .filter((n): n is Konva.Group => !!n && n.visible());
     tr.nodes(nodes);
     tr.getLayer()?.batchDraw();
-  }, [selected, design, editingId]);
+  }, [selected, design, editingId, croppingId]);
 
   const sel = design.elements.filter((e) => selected.includes(e.id));
   const anyLocked = sel.some((e) => e.locked);
@@ -125,20 +130,24 @@ export function Canvas() {
       releaseFocus();
       const store = useDesign.getState();
       const additive = e.evt.shiftKey || e.evt.metaKey;
-      if (additive) store.select(store.selected.includes(el.id) ? store.selected.filter((x) => x !== el.id) : [...store.selected, el.id]);
-      else if (!store.selected.includes(el.id)) store.select([el.id]);
+      // A click picks the element's whole group; a double click then picks the element alone.
+      const ids = withGroups(store.design.elements, [el.id]);
+      if (additive) store.select(store.selected.includes(el.id) ? store.selected.filter((x) => !ids.includes(x)) : [...new Set([...store.selected, ...ids])]);
+      else if (!store.selected.includes(el.id)) store.select(ids);
     },
     onDblClick: (el) => {
-      if (el.type === "text" && !el.locked) {
-        useDesign.getState().select([el.id]);
-        useUi.getState().setEditingText(el.id);
-      }
+      const store = useDesign.getState();
+      if (el.groupId && !(store.selected.length === 1 && store.selected[0] === el.id)) return store.select([el.id]);
+      if (el.locked) return;
+      store.select([el.id]);
+      if (el.type === "text") useUi.getState().setEditingText(el.id);
+      if (el.type === "image") useUi.getState().setCropping(el.id);
     },
     onDragStart: (el) => {
       setMoving(true);
       const store = useDesign.getState();
       const ids = store.selected.includes(el.id) ? store.selected : [el.id];
-      dragOrigin.current = new Map(store.design.elements.filter((x) => ids.includes(x.id)).map((x) => [x.id, { x: x.x, y: x.y }]));
+      dragOrigin.current = new Map(store.design.elements.filter((x) => ids.includes(x.id) && (!x.locked || x.id === el.id)).map((x) => [x.id, { x: x.x, y: x.y }]));
     },
     onDragMove: (el, e) => {
       const node = e.target;
@@ -216,6 +225,8 @@ export function Canvas() {
 
   const onStageDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     releaseFocus();
+    if (croppingId) useUi.getState().setCropping(null);
+    if (e.evt.button === 2) return; // the context menu handles right clicks
     const p = stageRef.current?.getPointerPosition();
     if (!p) return;
     if (spaceDown || e.evt.button === 1) {
@@ -248,19 +259,41 @@ export function Canvas() {
     if (!m || m.w < 3 || m.h < 3) return;
     const a = toPage({ x: m.x, y: m.y });
     const r = { x: a.x, y: a.y, w: m.w / zoom, h: m.h / zoom };
-    const hit = design.elements
-      .filter((el) => !el.hidden && !el.locked)
-      .filter((el) => {
-        const b = nodeBox(el);
-        return b.x < r.x + r.w && b.x + b.w > r.x && b.y < r.y + r.h && b.y + b.h > r.y;
-      })
-      .map((el) => el.id);
+    const hit = withGroups(
+      design.elements,
+      design.elements
+        .filter((el) => !el.hidden && !el.locked)
+        .filter((el) => {
+          const b = nodeBox(el);
+          return b.x < r.x + r.w && b.x + b.w > r.x && b.y < r.y + r.h && b.y + b.h > r.y;
+        })
+        .map((el) => el.id),
+    );
     const cur = useDesign.getState().selected;
     useDesign.getState().select(e.evt.shiftKey ? [...new Set([...cur, ...hit])] : hit);
   };
 
+  const onContextMenu = (e: Konva.KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+    useUi.getState().setCropping(null);
+    const store = useDesign.getState();
+    const id = e.target.findAncestor(".element", true)?.id();
+    const el = store.design.elements.find((x) => x.id === id);
+    // Right-clicking outside the selection selects what is under the pointer (its whole group).
+    if (!el) store.select([]);
+    else if (!store.selected.includes(el.id)) store.select(withGroups(store.design.elements, [el.id]));
+    const p = stageRef.current?.getPointerPosition();
+    openElementMenu({ x: e.evt.clientX, y: e.evt.clientY, at: p ? toPage(p) : undefined });
+  };
+
   const onWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
+    if (cropping && !(e.evt.ctrlKey || e.evt.metaKey)) {
+      // While cropping, scrolling zooms the photo inside its frame.
+      const c = cropping.crop ?? { x: 0.5, y: 0.5, zoom: 1 };
+      setCrop(cropping, { ...c, zoom: Math.min(10, Math.max(1, c.zoom * Math.exp(-e.evt.deltaY * 0.002))) });
+      return;
+    }
     if (e.evt.ctrlKey || e.evt.metaKey) {
       const p = stageRef.current?.getPointerPosition() ?? { x: size.w / 2, y: size.h / 2 };
       const next = Math.min(8, Math.max(0.05, zoom * Math.exp(-e.evt.deltaY * 0.01)));
@@ -277,6 +310,11 @@ export function Canvas() {
   };
 
   const editing = design.elements.find((e) => e.id === editingId && e.type === "text") as TextEl | undefined;
+  const cropping = design.elements.find((e) => e.id === croppingId && e.type === "image") as ImageEl | undefined;
+  // Cropping ends when the image is deselected or goes away.
+  useEffect(() => {
+    if (croppingId && (!cropping || !selected.includes(croppingId))) useUi.getState().setCropping(null);
+  }, [croppingId, cropping, selected]);
   // The edited text went away (another page opened, undo, the AI): stop editing so shortcuts work again.
   useEffect(() => {
     if (editingId && !editing) useUi.getState().setEditingText(null);
@@ -293,6 +331,7 @@ export function Canvas() {
           onMouseMove={onStageMove}
           onMouseUp={onStageUp}
           onWheel={onWheel}
+          onContextMenu={onContextMenu}
         >
           <Layer>
             <Rect x={origin.x} y={origin.y} width={design.width * zoom} height={design.height * zoom} shadowColor="black" shadowBlur={24} shadowOpacity={0.45} fill="#000" listening={false} />
@@ -301,6 +340,7 @@ export function Canvas() {
               {design.elements.map((el) => (
                 <ElementNode key={el.id} el={el} editing={el.id === editingId} h={handlers} />
               ))}
+              {cropping && <CropOverlay el={cropping} zoom={zoom} />}
             </Group>
           </Layer>
           <Layer>
@@ -337,7 +377,57 @@ export function Canvas() {
       {onlyText && !editing && !moving && !marquee && !sel[0].locked && (
         <TextToolbar el={sel[0] as TextEl} />
       )}
+      {cropping && <CropToolbar el={cropping} />}
+      <ElementMenu />
     </div>
+  );
+}
+
+export const setCrop = (el: ImageEl, crop: Crop) => useDesign.getState().patch(el.id, { crop });
+
+/**
+ * Crop mode for an image: the whole photo shows faded around its frame and is
+ * dragged to choose the visible part (scrolling or the toolbar zooms it).
+ */
+function CropOverlay({ el, zoom }: { el: ImageEl; zoom: number }) {
+  const img = useImage(el.src);
+  const ref = useRef<Konva.Image>(null);
+  // The move cursor set on hover must not outlive crop mode.
+  useEffect(() => {
+    const stage = ref.current?.getStage();
+    return () => void stage?.container().style.removeProperty("cursor");
+  }, [img]);
+  if (!img) return null;
+  const c = imageCrop(img.naturalWidth, img.naturalHeight, el.w, el.h, el.crop);
+  const fw = img.naturalWidth * c.scale;
+  const fh = img.naturalHeight * c.scale;
+  const clamp = (v: number, lo: number) => Math.min(0, Math.max(lo, v));
+  return (
+    <Group x={el.x} y={el.y} rotation={el.rotation}>
+      <KImage
+        ref={ref}
+        image={img}
+        x={-c.x * c.scale}
+        y={-c.y * c.scale}
+        width={fw}
+        height={fh}
+        opacity={0.4}
+        draggable
+        onMouseDown={(e) => void (e.cancelBubble = true)}
+        onMouseEnter={(e) => void (e.target.getStage()!.container().style.cursor = "move")}
+        onMouseLeave={(e) => void (e.target.getStage()!.container().style.cursor = "")}
+        onDblClick={() => useUi.getState().setCropping(null)}
+        onDragMove={(e) => {
+          const n = e.target;
+          const x = clamp(n.x(), el.w - fw);
+          const y = clamp(n.y(), el.h - fh);
+          n.position({ x, y });
+          setCrop(el, { x: fw > el.w ? -x / (fw - el.w) : 0.5, y: fh > el.h ? -y / (fh - el.h) : 0.5, zoom: el.crop?.zoom ?? 1 });
+        }}
+      />
+      <KImage image={img} width={el.w} height={el.h} crop={{ x: c.x, y: c.y, width: c.width, height: c.height }} cornerRadius={el.cornerRadius} listening={false} />
+      <Rect width={el.w} height={el.h} stroke="#d9603b" strokeWidth={2 / zoom} cornerRadius={el.cornerRadius} listening={false} />
+    </Group>
   );
 }
 
