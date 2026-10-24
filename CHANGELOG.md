@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.4
+
+- Group and ungroup elements (Cmd+G / Shift+Cmd+G); groups move, align, copy and duplicate as one and show in Layers under a renamable header
+- Crop images on the canvas: double-click a photo, then drag and zoom it inside its frame. The crop is kept in every export
+- Distribute the selection with equal gaps, a right-click menu on the canvas and layer rows, and Shift-click to select a range of layers
+- Cmd+V pastes the last thing copied, here or in another app: screenshots, copied images, image files or text
+- Version history (clock button in the top bar): snapshots are saved on open, before AI edits, every 10 minutes of editing and by hand, and can be previewed and restored
+- Icons: the Lucide set (~2,000) in a new Elements tab, with editable color and line thickness
+- QR codes for a link, a WhatsApp chat or text, drawn as vectors so they stay sharp in every export
+- Photo frames (circle, arch, triangle, star, hexagon, heart, blob) and photo adjustments (brightness, contrast, saturation, black and white, color overlay)
+- The AI and Claude Code can group, crop, add icons and QR codes, and frame and adjust photos
+- Settings → Open-source licenses shows the license of every bundled package
+
 ## 0.1.3
 
 - New Darkroom look, matching KlikReel: warm charcoal surfaces, tungsten-amber accents and new typography (Fraunces, IBM Plex Sans and IBM Plex Mono, bundled so they work offline)
