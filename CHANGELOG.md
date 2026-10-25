@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.7
+
+- Third-party notices now include every license and notice text for packages under more than one license, and a source link for the MPL-2.0 crates
+- The macOS DMG itself is now notarized and stapled, not only the app inside it
+- The app's copyright line now names its author
+
 ## 0.1.6
 
 - Settings → Open-source licenses now lists every bundled package and Rust crate, with source links for the MPL-2.0 crates

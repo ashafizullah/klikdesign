@@ -86,3 +86,17 @@ jobs:
           releaseDraft: true
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+      # tauri-action notarizes the app but not the DMG around it; notarize and staple
+      # the DMG too so Gatekeeper accepts it offline, then replace the uploaded copy.
+      - name: Notarize and staple the DMG
+        if: matrix.platform == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD" --wait
+          xcrun stapler staple "$dmg"
+          gh release upload "$GITHUB_REF_NAME" "$dmg" --clobber

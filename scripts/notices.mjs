@@ -99,6 +99,8 @@ function licenseFiles(dir) {
 /** License text for a package; prefers the MIT file of dual-licensed packages. */
 function licenseText(dir, expr, name) {
   const files = licenseFiles(dir);
+  // "A AND B" (or "(MIT OR X) AND Y") applies every license, so ship all the files.
+  if (/\bAND\b/.test(expr) && files.length) return files.map((f) => readFileSync(join(dir, f), "utf8").trim()).join("\n\n");
   const mit = files.find((f) => /^licen[cs]e[-_.]?mit/i.test(f));
   const pick = /\bMIT\b/.test(expr) && mit ? [mit] : files.filter((f) => !/^licen[cs]e[-_.]?(apache|bsd|zlib|unlicense)/i.test(f) || files.length === 1);
   const chosen = pick.length ? pick : files;
