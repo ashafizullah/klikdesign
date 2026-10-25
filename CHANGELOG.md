@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- The Linux AppImage, .deb and .rpm now run on older distributions (glibc 2.35 and newer, e.g. Ubuntu 22.04), not only on the newest ones
+
 ## 0.1.4
 
 - Group and ungroup elements (Cmd+G / Shift+Cmd+G); groups move, align, copy and duplicate as one and show in Layers under a renamable header
