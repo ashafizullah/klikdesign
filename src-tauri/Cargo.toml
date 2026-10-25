@@ -1,6 +1,6 @@
 [package]
 name = "klikdesign"
-version = "0.1.9"
+version = "0.1.10"
 description = "Design posters with AI: prompt a layout, then refine it on a canvas or by chat"
 authors = ["Adam Suchi Hafizullah"]
 edition = "2024"

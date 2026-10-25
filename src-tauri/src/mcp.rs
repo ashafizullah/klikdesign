@@ -1,6 +1,6 @@
 //! Local MCP server (Streamable HTTP, JSON responses) that lets the user's own
-//! Claude Code edit the open design. The user adds it to Claude Code
-//! themselves; this server only answers tool calls. Tool definitions and their
+//! coding agent (Claude Code, Codex or any MCP client) edit the open design.
+//! The user adds it to their agent themselves; this server only answers tool calls. Tool definitions and their
 //! execution live in the frontend: each call is relayed over a channel and
 //! answered with `mcp_reply`.
 use crate::error::AppResult;
@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 use tokio::sync::oneshot;
 
-/// Preferred port, so the `claude mcp add` command keeps working across restarts.
+/// Preferred port, so the server the user added keeps working across restarts.
 const PORT: u16 = 47822;
 /// Long calls (large exports) get plenty of time.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30 * 60);
@@ -37,7 +37,7 @@ pub struct McpCall {
     arguments: Value,
 }
 
-/// Whether a client (the user's Claude Code) is talking to the server.
+/// Whether a client (the user's agent) is talking to the server.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct McpLink {
@@ -63,7 +63,7 @@ struct Inner {
     bridge: Mutex<Option<Channel<McpCall>>>,
     pending: Mutex<HashMap<u64, oneshot::Sender<Value>>>,
     next_id: AtomicU64,
-    /// Open GET streams; Claude Code keeps one open for as long as its session runs.
+    /// Open GET streams; agents such as Claude Code keep one open for as long as their session runs.
     streams: AtomicUsize,
     last_seen: Mutex<Option<Instant>>,
     client: Mutex<Option<String>>,
@@ -84,7 +84,7 @@ pub struct Mcp {
     running: Mutex<Option<(u16, oneshot::Sender<()>)>>,
 }
 
-/// Secret shared with Claude Code; kept in the app data folder so the added server survives restarts.
+/// Secret shared with the agent; kept in the app data folder so the added server survives restarts.
 fn load_token(dir: &PathBuf) -> String {
     let path = dir.join("mcp-token");
     if let Ok(t) = std::fs::read_to_string(&path) {
@@ -216,7 +216,7 @@ fn authorize(inner: &Inner, headers: &HeaderMap) -> Result<(), (StatusCode, &'st
 }
 
 /// Server-to-client SSE stream. KlikDesign sends nothing on it but keepalives;
-/// it is how the app knows Claude Code is still connected.
+/// it is how the app knows the agent is still connected.
 async fn stream(State(inner): State<Arc<Inner>>, headers: HeaderMap) -> Response {
     if let Err(r) = authorize(&inner, &headers) {
         return r.into_response();

@@ -1,4 +1,5 @@
-// Tools the local MCP server offers to the user's own Claude Code. The Rust
+// Tools the local MCP server offers to the user's own coding agent (Claude
+// Code, Codex or any other MCP client). The Rust
 // side relays each call here; edits go through the same stores as the UI, so
 // the canvas updates live and everything can be undone.
 import { useEffect } from "react";
@@ -46,7 +47,7 @@ const str = { type: "string" };
 const num = { type: "number" };
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object", properties, required });
 
-// Claude Code reads the project folder with its own tools.
+// The agent reads the project folder with its own tools.
 const SKIPPED = new Set(["list_files", "read_file", "search_code"]);
 
 const TOOLS: ToolDef[] = [
@@ -197,7 +198,7 @@ async function handle(call: McpCall) {
     if (!DESIGNLESS.has(call.name) && useApp.getState().view !== "editor") throw new Error("No design is open in KlikDesign. Use list_designs, then open_design or create_design.");
     // The in-app AI writes into the open design too; never interleave with it.
     if (!READ_ONLY.has(call.name) && useChat.getState().busy) throw new Error("KlikDesign's own AI is editing this design right now; wait until it finishes and try again.");
-    if (!READ_ONLY.has(call.name) && useApp.getState().view === "editor") await snapshotBeforeExternal().catch(() => {});
+    if (!READ_ONLY.has(call.name) && useApp.getState().view === "editor") await snapshotBeforeExternal(agentName(useMcp.getState().link?.client)).catch(() => {});
     result = { content: toContent(await run(call.name, call.arguments ?? {})) };
   } catch (e) {
     result = { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
@@ -212,17 +213,23 @@ export interface McpLink {
   idleSecs: number | null;
 }
 
+/** The agent the setup instructions are shown for; the server itself works with any MCP client. */
+export type McpClient = "claude" | "codex" | "other";
+
 interface McpState {
   enabled: boolean;
+  client: McpClient;
   info: McpInfo | null;
   link: McpLink | null;
   setEnabled(on: boolean): Promise<void>;
+  setClient(client: McpClient): void;
 }
 
 export const useMcp = create<McpState>()(
   persist(
     (set) => ({
       enabled: false,
+      client: "claude",
       info: null,
       link: null,
       setEnabled: async (enabled) => {
@@ -237,12 +244,13 @@ export const useMcp = create<McpState>()(
         const info = await invoke<McpInfo>("mcp_start", { tools, instructions: INSTRUCTIONS, onCall });
         set({ enabled, info });
       },
+      setClient: (client) => set({ client }),
     }),
-    { name: "klikdesign-mcp", partialize: (s) => ({ enabled: s.enabled }) },
+    { name: "klikdesign-mcp", partialize: (s) => ({ enabled: s.enabled, client: s.client }) },
   ),
 );
 
-/** Polls whether Claude Code is connected while the server runs. */
+/** Polls whether an agent is connected while the server runs. */
 export function useMcpLink(): McpLink | null {
   const enabled = useMcp((s) => s.enabled);
   useEffect(() => {
@@ -262,5 +270,27 @@ export function useMcpLink(): McpLink | null {
  */
 if (useMcp.getState().enabled) useMcp.getState().setEnabled(true).catch(() => useMcp.setState({ enabled: false }));
 
-export const addCommand = (info: McpInfo) =>
-  `claude mcp add --transport http --scope user klikdesign ${info.url} --header "Authorization: Bearer ${info.token}"`;
+/** What the user adds to their agent once: a command for Claude Code, config for the others. */
+export function setupSnippet(client: McpClient, info: McpInfo): string {
+  const auth = `Bearer ${info.token}`;
+  switch (client) {
+    case "claude":
+      return `claude mcp add --transport http --scope user klikdesign ${info.url} --header "Authorization: ${auth}"`;
+    case "codex":
+      return `[mcp_servers.klikdesign]\nurl = "${info.url}"\nhttp_headers = { "Authorization" = "${auth}" }`;
+    case "other":
+      return JSON.stringify({ mcpServers: { klikdesign: { url: info.url, headers: { Authorization: auth } } } }, null, 2);
+  }
+}
+
+/** The command that starts the agent in a terminal; null when it isn't a terminal app. */
+export const agentCommand = (client: McpClient): string | null => (client === "other" ? null : client);
+
+/** A readable name for the connected client from its `clientInfo`, e.g. "codex-mcp-client 0.40.0" → "Codex". */
+export function agentName(client: string | null | undefined): string {
+  if (!client) return "MCP";
+  if (/^claude-code\b/i.test(client)) return "Claude Code";
+  if (/codex/i.test(client)) return "Codex";
+  if (/cursor/i.test(client)) return "Cursor";
+  return client.replace(/ v?\d[\w.+-]*$/, "");
+}

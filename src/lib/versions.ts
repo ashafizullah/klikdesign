@@ -1,6 +1,6 @@
 // Version history: snapshots of the whole design (every page) kept with it, so
 // earlier states survive closing the app, unlike undo. Snapshots are taken when
-// a design opens, before the AI or Claude Code edits it, every few minutes of
+// a design opens, before the AI or an MCP agent edits it, every few minutes of
 // editing, before a restore, and when the user saves one by hand.
 import { create } from "zustand";
 import type { Design } from "../types/design";
@@ -24,7 +24,7 @@ export interface VersionMeta {
 
 /** Editing time between automatic snapshots. */
 const AUTO_EVERY = 10 * 60_000;
-/** Claude Code edits in many small calls: one snapshot per burst. */
+/** MCP agents edit in many small calls: one snapshot per burst. */
 const EXTERNAL_EVERY = 3 * 60_000;
 
 /** Bumps when a design's versions change, so the history list reloads. */
@@ -89,11 +89,11 @@ export async function maybeAutoSnapshot() {
   await snapshot("auto");
 }
 
-/** Before Claude Code (MCP) changes the design: one snapshot per burst of calls. */
-export async function snapshotBeforeExternal() {
+/** Before an MCP agent changes the design: one snapshot per burst of calls. */
+export async function snapshotBeforeExternal(agent: string) {
   const { design } = useDesign.getState();
   if (last?.designId === design.id && Date.now() - last.at < EXTERNAL_EVERY) return;
-  await snapshot("ai", "Claude Code");
+  await snapshot("ai", agent);
 }
 
 /**

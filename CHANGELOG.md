@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.10
+
+- Connect Codex or any other MCP client, not only Claude Code: the **Connect AI agent** panel in the terminal shows the setup for Claude Code, Codex (`~/.codex/config.toml`) or other clients (`mcpServers` JSON)
+- The badge and version history name the agent that is connected
+
 ## 0.1.9
 
 - The app now checks for updates every time it opens, not at most once a day

@@ -1,13 +1,13 @@
-import { useMcpLink } from "../../lib/mcp";
+import { agentName, useMcpLink } from "../../lib/mcp";
 import { useUi } from "../../store/ui";
 import { useT } from "../../i18n";
 
-/** Top-bar status of the MCP link: green once the user's Claude Code is connected. */
+/** Top-bar status of the MCP link: green once the user's agent is connected. */
 export function McpBadge() {
   const t = useT();
   const link = useMcpLink();
   if (!link?.running) return null;
-  const title = link.connected ? t("mcp.connectedTitle", { client: link.client ?? "Claude Code" }) : t("mcp.waitingTitle");
+  const title = link.connected ? t("mcp.connectedTitle", { client: link.client ?? "MCP" }) : t("mcp.waitingTitle");
   return (
     <button
       title={title}
@@ -18,7 +18,7 @@ export function McpBadge() {
       }`}
     >
       <span className={`h-1.5 w-1.5 rounded-full bg-ok ${link.connected ? "shadow-[0_0_6px] shadow-ok/70" : ""}`} />
-      {link.connected ? t("mcp.connected") : t("mcp.waiting")}
+      {link.connected ? t("mcp.connected", { client: agentName(link.client) }) : t("mcp.waiting")}
     </button>
   );
 }

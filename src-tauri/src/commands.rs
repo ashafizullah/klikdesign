@@ -274,7 +274,7 @@ pub fn terminal_close(id: String, state: State<'_, Terminals>) {
     state.close(&id);
 }
 
-// ---- MCP (Claude Code) -------------------------------------------------------
+// ---- MCP (coding agents) -----------------------------------------------------
 
 use crate::mcp::{Mcp, McpCall, McpInfo, McpLink};
 
@@ -303,7 +303,7 @@ pub fn mcp_reply(id: u64, result: serde_json::Value, state: State<'_, Mcp>) {
     state.reply(id, result);
 }
 
-/// Writes an export that Claude Code asked for (over MCP) to an absolute path.
+/// Writes an export that an agent asked for (over MCP) to an absolute path.
 #[tauri::command]
 pub fn export_write(path: String, data: String) -> AppResult<()> {
     use base64::Engine;

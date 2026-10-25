@@ -37,19 +37,22 @@
 - **Export** to PNG and JPG (0.5×–3×), PDF for print, and SVG
 - **Bring your own model**: Anthropic or any OpenAI-compatible API; keys are stored in the OS keychain
 - **Built-in terminal** (Ctrl+`): your own login shell, opened in the project folder. It runs commands with your user's permissions, like any terminal
-- **Works with Claude Code**: turn on the local MCP server and your own Claude Code can lay out and edit designs, place images, look at the result and export
+- **Works with Claude Code, Codex and other MCP clients**: turn on the local MCP server and your own coding agent can lay out and edit designs, place images, look at the result and export
 - **Auto-save** to a local library, and **auto-update** from GitHub Releases (signed packages)
 - **English and Bahasa Indonesia** interface
 
-## Using Claude Code
+## Using Claude Code, Codex or another agent
 
-KlikDesign can be driven by [Claude Code](https://claude.com/claude-code) installed on your own computer, signed in with your own account (including Pro/Max plans):
+KlikDesign can be driven by a coding agent installed on your own computer and signed in with your own account, such as [Claude Code](https://claude.com/claude-code) (including Pro/Max plans), [Codex](https://github.com/openai/codex) or any client that supports MCP over HTTP (Cursor, Gemini CLI…):
 
-1. Open a design, open the terminal (Ctrl+`) and click **Connect Claude Code**.
-2. Enable the local MCP server and copy the `claude mcp add …` command. Run it once in any terminal.
-3. Start `claude` and ask for changes, e.g. *"make a launch poster for our new feature"*. Edits appear live in KlikDesign and can be undone.
+1. Open a design, open the terminal (Ctrl+`) and click **Connect AI agent**.
+2. Enable the local MCP server, pick your agent and copy the setup:
+   - **Claude Code**: a `claude mcp add …` command. Run it once in any terminal.
+   - **Codex**: a `[mcp_servers.klikdesign]` block. Add it once to `~/.codex/config.toml`.
+   - **Other**: an `mcpServers` JSON entry (URL plus an `Authorization` header). Add it to your client's MCP config, e.g. `~/.cursor/mcp.json`.
+3. Start the agent and ask for changes, e.g. *"make a launch poster for our new feature"*. Edits appear live in KlikDesign and can be undone.
 
-The server only listens on `127.0.0.1` and requires a secret token. KlikDesign never runs Claude Code, sends it prompts or touches your Claude credentials: you add the server and start Claude Code yourself (the terminal's **Type claude** button only types the command; you press Enter).
+The server only listens on `127.0.0.1` and requires a secret token. KlikDesign never runs your agent, sends it prompts or touches its credentials: you add the server and start the agent yourself (the terminal's **Type claude** / **Type codex** button only types the command; you press Enter).
 
 ## Download
 
@@ -77,7 +80,7 @@ KlikDesign has no account, telemetry or server of its own. Designs, images and s
 - **Google Fonts**, to load the curated fonts
 - **GitHub**, to check for and download updates
 
-If you connect Claude Code, it sends what KlikDesign's tools return (such as the design and rendered images) to Anthropic under your own account.
+If you connect a coding agent, it sends what KlikDesign's tools return (such as the design and rendered images) to its provider (Anthropic for Claude Code, OpenAI for Codex…) under your own account.
 
 ## Requirements
 
