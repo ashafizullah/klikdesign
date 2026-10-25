@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9
+
+- The app now checks for updates every time it opens, not at most once a day
+
 ## 0.1.8
 
 - The Quote template uses an original placeholder line instead of a quote misattributed to Leonardo da Vinci

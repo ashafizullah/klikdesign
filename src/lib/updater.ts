@@ -4,9 +4,6 @@ import { create } from "zustand";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
-const LAST_CHECK = "klikdesign-update-checked";
-const DAY = 24 * 60 * 60 * 1000;
-
 interface UpdateState {
   update: Update | null;
   checking: boolean;
@@ -35,11 +32,6 @@ export async function checkForUpdate(): Promise<Update | null> {
   useUpdate.setState({ checking: true });
   try {
     const update = await check();
-    try {
-      localStorage.setItem(LAST_CHECK, String(Date.now()));
-    } catch {
-      /* storage unavailable: check again next launch */
-    }
     if (update) useUpdate.setState({ update });
     return update;
   } finally {
@@ -47,17 +39,10 @@ export async function checkForUpdate(): Promise<Update | null> {
   }
 }
 
-/** Quiet check shortly after launch, at most once a day. */
+/** Quiet check shortly after every launch. */
 export function scheduleUpdateCheck(): () => void {
   if (import.meta.env.DEV || !("__TAURI_INTERNALS__" in window)) return () => {};
-  let last = 0;
-  try {
-    last = Number(localStorage.getItem(LAST_CHECK)) || 0;
-  } catch {
-    /* ignore */
-  }
-  if (Date.now() - last < DAY) return () => {};
-  const timer = setTimeout(() => void checkForUpdate().catch(() => {}), 8000);
+  const timer = setTimeout(() => void checkForUpdate().catch(() => {}), 3000);
   return () => clearTimeout(timer);
 }
 
