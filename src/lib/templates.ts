@@ -79,9 +79,9 @@ export const TEMPLATES: Template[] = [
       background: "#111111",
       elements: [
         text({ x: 90, y: 160, w: 300, text: "“", fontFamily: "DM Serif Display", fontSize: 320, fill: "#e8c547", lineHeight: 1 }),
-        text({ x: 90, y: 470, w: 900, text: "Simplicity is the ultimate sophistication.", fontFamily: "DM Serif Display", fontSize: 104, fill: "#ffffff", lineHeight: 1.12 }),
+        text({ x: 90, y: 470, w: 900, text: "Say one thing, and say it well.", fontFamily: "DM Serif Display", fontSize: 104, fill: "#ffffff", lineHeight: 1.12 }),
         shape({ shape: "line", x: 90, y: 1000, w: 160, h: 12, stroke: "#e8c547", strokeWidth: 6 }),
-        text({ x: 90, y: 1050, w: 900, text: "LEONARDO DA VINCI", fontFamily: "Inter", fontSize: 34, fontWeight: 600, fill: "#bdbdbd", letterSpacing: 8 }),
+        text({ x: 90, y: 1050, w: 900, text: "YOUR NAME", fontFamily: "Inter", fontSize: 34, fontWeight: 600, fill: "#bdbdbd", letterSpacing: 8 }),
       ],
     },
   },

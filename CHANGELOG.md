@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8
+
+- The Quote template uses an original placeholder line instead of a quote misattributed to Leonardo da Vinci
+
 ## 0.1.7
 
 - Third-party notices now include every license and notice text for packages under more than one license, and a source link for the MPL-2.0 crates
