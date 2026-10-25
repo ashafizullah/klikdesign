@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6
+
+- Settings → Open-source licenses now lists every bundled package and Rust crate, with source links for the MPL-2.0 crates
+- The app now enforces a Content Security Policy, so the interface only loads its own code and assets plus Google Fonts
+- README: a Privacy section on what is sent where, and clearer notes on the terminal and Claude Code
+
 ## 0.1.5
 
 - The Linux AppImage, .deb and .rpm now run on older distributions (glibc 2.35 and newer, e.g. Ubuntu 22.04), not only on the newest ones
