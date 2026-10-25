@@ -50,3 +50,20 @@ jobs:
         working-directory: src-tauri
       - run: cargo test
         working-directory: src-tauri
+
+  licenses:
+    # Only permissive licenses may ship; see deny.toml and scripts/notices.mjs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - run: bun install --frozen-lockfile
+      - name: Notices are complete and up to date
+        run: |
+          bun run notices
+          git diff --exit-code THIRD_PARTY_NOTICES.md || (echo "Run 'bun run notices' and commit THIRD_PARTY_NOTICES.md" >&2; exit 1)
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          command: check licenses

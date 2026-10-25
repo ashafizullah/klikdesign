@@ -1,0 +1,40 @@
+# `cargo deny check licenses`: only permissive licenses may ship in KlikDesign.
+# Keep in sync with ALLOWED in scripts/notices.mjs.
+[graph]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+]
+exclude-dev = true
+
+[licenses]
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "0BSD",
+  "Unlicense",
+  "Unicode-3.0",
+  "CC0-1.0",
+  "BSL-1.0",
+  # File-level copyleft, used unmodified: cssparser, cssparser-macros, dtoa-short,
+  # selectors (via Tauri) and option-ext (via dirs).
+  "MPL-2.0",
+]
+confidence-threshold = 0.9
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+
+[advisories]
+yanked = "warn"
