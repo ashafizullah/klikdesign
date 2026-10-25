@@ -32,6 +32,8 @@ jobs:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: swatinem/rust-cache@v2
         with:
+          # The OS image is not in the default key; a cache from a newer Ubuntu links against a newer glibc.
+          key: ${{ matrix.platform }}
           workspaces: src-tauri
       - run: bun install --frozen-lockfile
       - name: Read this version's changelog

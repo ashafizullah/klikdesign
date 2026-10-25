@@ -39,6 +39,8 @@ jobs:
           components: clippy, rustfmt
       - uses: swatinem/rust-cache@v2
         with:
+          # The OS image is not in the default key; a cache from a newer Ubuntu links against a newer glibc.
+          key: ${{ matrix.platform }}
           workspaces: src-tauri
       # generate_context! embeds the built frontend, so it must exist.
       - run: bun install --frozen-lockfile && bun run build
