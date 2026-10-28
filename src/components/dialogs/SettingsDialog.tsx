@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Check, CircleDot, ListRestart, Loader2, Trash2, Zap } from "lucide-react";
 import { EFFORTS, PROFILE_PRESETS, useSettings, type AiProfile, type ApiFormat, type Effort } from "../../store/settings";
 import { notifyError, useUi } from "../../store/ui";
@@ -20,6 +21,7 @@ export function SettingsDialog() {
   return (
     <Modal title={t("settings.title")} onClose={close} width={800}>
       <div className="mb-4 flex items-center justify-end gap-2 text-[12px] text-muted">
+        <button className="hover:text-text" onClick={() => openUrl("https://github.com/ashafizullah/klikdesign").catch(notifyError)}>GitHub</button>
         <button className="mr-auto hover:text-text" onClick={() => setNotices(true)}>{t("settings.licenses")}</button>
         {t("settings.appLanguage")} <LanguageToggle />
       </div>
