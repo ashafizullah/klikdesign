@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11
+
+- Settings has a GitHub button, next to Open-source licenses
+
 ## 0.1.10
 
 - Connect Codex or any other MCP client, not only Claude Code: the **Connect AI agent** panel in the terminal shows the setup for Claude Code, Codex (`~/.codex/config.toml`) or other clients (`mcpServers` JSON)
